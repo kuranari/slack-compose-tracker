@@ -122,6 +122,10 @@ test.describe("日本語入力 (IME)", () => {
 		expect(Date.now() - (record?.endedAt ?? 0)).toBeLessThan(
 			SEND_WINDOW_MS * 3,
 		);
+		// 変換中にバッジが出た (= 定期チェックが走った) 後でも、未確定の文字は履歴に残らない
+		const texts = record?.snapshots.map((s) => s.text) ?? [];
+		expect(texts.some((t) => t.includes("にほんご"))).toBe(false);
+		expect(texts.at(-1)).toBe("日本語");
 	});
 
 	test("確定後の送信は記録され、文字数は確定後のテキストで数える", async ({
@@ -144,5 +148,7 @@ test.describe("日本語入力 (IME)", () => {
 			length: 3,
 			text: "テスト",
 		});
+		// 変換中に始まった下書きでも、履歴は確定後の文字だけになる
+		expect(record?.snapshots.map((s) => s.text)).toEqual(["テスト"]);
 	});
 });

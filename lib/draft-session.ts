@@ -29,10 +29,15 @@ export function draftKey(ctx: DraftContext): string {
 		.join("/");
 }
 
+// composing: IME で変換中 (未確定の文字を含む) か。
+// 履歴には確定済みの文字だけを残す。変換中の「にほんご」を残すと、次の履歴で「日本語」に
+// 変わったときに、ただの変換が書き直し (削除＋挿入) として数えられてしまうため。
+// 開始時刻は変換中でも最初のキー入力にする (変換中の入力も作成時間のうち)
 export function recordInput(
 	session: DraftSession | undefined,
 	now: number,
 	text: string,
+	composing = false,
 ): DraftSession {
 	if (!session) {
 		return {
@@ -40,7 +45,8 @@ export function recordInput(
 			lastInputAt: now,
 			inputCount: 1,
 			text,
-			snapshots: [{ at: 0, text }],
+			// 変換中に始まった下書きは、最初の履歴を確定後の observeText に任せる
+			snapshots: composing ? [] : [{ at: 0, text }],
 		};
 	}
 	return {
@@ -60,18 +66,21 @@ const appendSnapshot = (
 		? [...snapshots]
 		: [...snapshots, { at, text }];
 
-// 入力欄の現在の全文を観測する。input イベント以外 (補完など) での変化もここで拾う
+// 入力欄の現在の全文を観測する。input イベント以外 (補完など) での変化もここで拾う。
+// 変換中は履歴を見送り、確定後の最初の観測で取る (間隔はそのとき改めて判定する)
 export function observeText(
 	session: DraftSession,
 	now: number,
 	text: string,
+	composing = false,
 ): DraftSession {
+	if (composing) return { ...session, text };
 	const at = now - session.startedAt;
-	const lastAt = session.snapshots.at(-1)?.at ?? 0;
-	const snapshots =
-		at - lastAt >= SNAPSHOT_INTERVAL_MS
-			? appendSnapshot(session.snapshots, at, text)
-			: session.snapshots;
+	const last = session.snapshots.at(-1);
+	const due = !last || at - last.at >= SNAPSHOT_INTERVAL_MS;
+	const snapshots = due
+		? appendSnapshot(session.snapshots, at, text)
+		: session.snapshots;
 	return { ...session, text, snapshots };
 }
 

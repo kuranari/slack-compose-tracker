@@ -62,6 +62,27 @@ export default defineContentScript({
 			return c ? draftKey(c) : null;
 		};
 
+		// IME で変換中の入力欄。履歴に未確定の文字を残さないために使う (lib/draft-session.ts)
+		const composing = new WeakSet<HTMLElement>();
+		ctx.addEventListener(
+			document,
+			"compositionstart",
+			(e) => {
+				const composer = closestComposer(e.target);
+				if (composer) composing.add(composer);
+			},
+			{ capture: true },
+		);
+		ctx.addEventListener(
+			document,
+			"compositionend",
+			(e) => {
+				const composer = closestComposer(e.target);
+				if (composer) composing.delete(composer);
+			},
+			{ capture: true },
+		);
+
 		const markSend = (composer: HTMLElement | null) => {
 			const key = keyOf(composer);
 			if (key) pendingSends.set(key, Date.now());
@@ -100,7 +121,10 @@ export default defineContentScript({
 				if (!text) return;
 				const key = draftKey(c);
 				const prev = sessions.get(key);
-				sessions.set(key, recordInput(prev, Date.now(), text));
+				sessions.set(
+					key,
+					recordInput(prev, Date.now(), text, composing.has(composer)),
+				);
 				if (!prev) log("start", c);
 			},
 			{ capture: true },
@@ -141,7 +165,10 @@ export default defineContentScript({
 				if (!c || !key || !session) continue;
 				const text = composerText(composer);
 				if (text) {
-					sessions.set(key, observeText(session, now, text));
+					sessions.set(
+						key,
+						observeText(session, now, text, composing.has(composer)),
+					);
 					items.push({
 						composer,
 						text: formatDuration(now - session.startedAt),

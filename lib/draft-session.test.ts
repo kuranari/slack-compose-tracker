@@ -73,6 +73,46 @@ describe("observeText", () => {
 	});
 });
 
+describe("IME で変換中の入力", () => {
+	it("変換中に始まった下書きは、開始時刻は記録するが最初の履歴は取らない", () => {
+		const s = recordInput(undefined, 1_000, "に", true);
+		expect(s.startedAt).toBe(1_000);
+		expect(s.snapshots).toEqual([]);
+	});
+
+	it("変換中は間隔を過ぎても履歴を取らず、本文だけ更新する", () => {
+		const start = recordInput(undefined, 0, "a");
+		const s = observeText(start, SNAPSHOT_INTERVAL_MS, "aにほんご", true);
+		expect(s.text).toBe("aにほんご");
+		expect(s.snapshots).toEqual([{ at: 0, text: "a" }]);
+	});
+
+	it("確定後の最初の観測で、見送った履歴を取る", () => {
+		const start = recordInput(undefined, 0, "a");
+		const composing = observeText(
+			start,
+			SNAPSHOT_INTERVAL_MS,
+			"aにほんご",
+			true,
+		);
+		const committed = observeText(
+			composing,
+			SNAPSHOT_INTERVAL_MS + 2_000,
+			"a日本語",
+		);
+		expect(committed.snapshots).toEqual([
+			{ at: 0, text: "a" },
+			{ at: SNAPSHOT_INTERVAL_MS + 2_000, text: "a日本語" },
+		]);
+	});
+
+	it("最初の履歴が無ければ、確定後は間隔を待たずにすぐ取る", () => {
+		const s0 = recordInput(undefined, 0, "に", true);
+		const s1 = observeText(s0, 500, "日本", false);
+		expect(s1.snapshots).toEqual([{ at: 500, text: "日本" }]);
+	});
+});
+
 describe("closeSession", () => {
 	const session = recordInput(
 		recordInput(undefined, 1_000, "a"),
