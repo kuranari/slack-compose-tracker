@@ -36,3 +36,6 @@ blob-report
 
 # 書き出した記録 (本文を含む)
 data
+
+# エージェント用の作業ツリー
+.claude/worktrees
