@@ -126,6 +126,10 @@ test.describe("日本語入力 (IME)", () => {
 		const texts = record?.snapshots.map((s) => s.text) ?? [];
 		expect(texts.some((t) => t.includes("にほんご"))).toBe(false);
 		expect(texts.at(-1)).toBe("日本語");
+		// 比較用の rawSnapshots には、変換中の文字が残る
+		const rawTexts = record?.rawSnapshots?.map((s) => s.text) ?? [];
+		expect(rawTexts[0]).toBe("にほんご");
+		expect(rawTexts.at(-1)).toBe("日本語");
 	});
 
 	test("確定後の送信は記録され、文字数は確定後のテキストで数える", async ({

@@ -26,7 +26,11 @@ export type ComposeRecord = {
 	outcome: ComposeOutcome;
 	// 送信または破棄の直前に入力欄にあった全文
 	text: string;
+	// IME で確定した文字だけの履歴 (分析・再生の既定)
 	snapshots: Snapshot[];
+	// 変換中の未確定文字も含む履歴。確定だけの履歴と比べるために並行して残す。
+	// 2026-10-30 より前の記録には無い
+	rawSnapshots?: Snapshot[];
 };
 
 export type Summary = {

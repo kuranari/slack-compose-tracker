@@ -1,4 +1,4 @@
-// 使い方: npm run analyze -- <records.jsonl> [--out <report.md>] [--top N]
+// 使い方: npm run analyze -- <records.jsonl> [--out <report.md>] [--top N] [--raw]
 // ファイルの読み書きだけを担う IO 層。分析とレポートの中身は report.ts 以下の純粋関数に任せる
 import { readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
@@ -6,7 +6,7 @@ import { parseJsonl } from "./jsonl.ts";
 import { renderReport } from "./report.ts";
 
 const USAGE =
-	"使い方: npm run analyze -- <records.jsonl> [--out <report.md>] [--top N]";
+	"使い方: npm run analyze -- <records.jsonl> [--out <report.md>] [--top N] [--raw]";
 
 const main = (): number => {
 	const { values, positionals } = parseArgs({
@@ -14,6 +14,8 @@ const main = (): number => {
 		options: {
 			out: { type: "string" },
 			top: { type: "string", default: "10" },
+			// 変換中の未確定文字も含む履歴 (rawSnapshots) で分析する。確定だけの履歴と比べる用
+			raw: { type: "boolean", default: false },
 			help: { type: "boolean", short: "h" },
 		},
 	});
@@ -32,7 +34,14 @@ const main = (): number => {
 	for (const e of errors) {
 		console.error(`${input}:${e.line}: 読み飛ばしました (${e.message})`);
 	}
-	const report = renderReport(records, { top });
+	// rawSnapshots が無い古い記録は、確定だけの履歴で代用する
+	const target = values.raw
+		? records.map((r) => ({ ...r, snapshots: r.rawSnapshots ?? r.snapshots }))
+		: records;
+	console.error(
+		`履歴: ${values.raw ? "変換中も含む (rawSnapshots)" : "確定した文字だけ (snapshots)"}`,
+	);
+	const report = renderReport(target, { top });
 	if (values.out) {
 		writeFileSync(values.out, `${report}\n`);
 		console.error(

@@ -38,6 +38,7 @@ describe("recordInput", () => {
 			inputCount: 2,
 			text: "abc",
 			snapshots: [{ at: 0, text: "a" }],
+			rawSnapshots: [{ at: 0, text: "a" }],
 		});
 	});
 });
@@ -111,6 +112,31 @@ describe("IME で変換中の入力", () => {
 		const s1 = observeText(s0, 500, "日本", false);
 		expect(s1.snapshots).toEqual([{ at: 500, text: "日本" }]);
 	});
+
+	it("変換中も含む履歴 (raw) は、変換中かどうかに関係なく間隔どおりに取る", () => {
+		const s0 = recordInput(undefined, 0, "に", true);
+		const s1 = observeText(s0, SNAPSHOT_INTERVAL_MS, "にほんご", true);
+		const s2 = observeText(s1, SNAPSHOT_INTERVAL_MS + 500, "日本語", false);
+		expect(s2.rawSnapshots).toEqual([
+			{ at: 0, text: "に" },
+			{ at: SNAPSHOT_INTERVAL_MS, text: "にほんご" },
+		]);
+		// 確定だけの履歴は確定後すぐに取る
+		expect(s2.snapshots).toEqual([
+			{ at: SNAPSHOT_INTERVAL_MS + 500, text: "日本語" },
+		]);
+	});
+
+	it("締めると両方の履歴の末尾に最終形が入る", () => {
+		const s0 = recordInput(undefined, 0, "に", true);
+		const s1 = recordInput(s0, 1_000, "日本");
+		const record = closeSession(s1, channel, 3_000, 2_000);
+		expect(record.snapshots).toEqual([{ at: 2_000, text: "日本" }]);
+		expect(record.rawSnapshots).toEqual([
+			{ at: 0, text: "に" },
+			{ at: 2_000, text: "日本" },
+		]);
+	});
 });
 
 describe("closeSession", () => {
@@ -135,6 +161,10 @@ describe("closeSession", () => {
 			outcome: "sent",
 			text: "abcd",
 			snapshots: [
+				{ at: 0, text: "a" },
+				{ at: 5_000, text: "abcd" },
+			],
+			rawSnapshots: [
 				{ at: 0, text: "a" },
 				{ at: 5_000, text: "abcd" },
 			],

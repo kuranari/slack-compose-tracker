@@ -21,6 +21,7 @@ export type DraftSession = {
 	inputCount: number;
 	text: string;
 	snapshots: Snapshot[];
+	rawSnapshots: Snapshot[];
 };
 
 export function draftKey(ctx: DraftContext): string {
@@ -32,7 +33,9 @@ export function draftKey(ctx: DraftContext): string {
 // composing: IME で変換中 (未確定の文字を含む) か。
 // 履歴には確定済みの文字だけを残す。変換中の「にほんご」を残すと、次の履歴で「日本語」に
 // 変わったときに、ただの変換が書き直し (削除＋挿入) として数えられてしまうため。
-// 開始時刻は変換中でも最初のキー入力にする (変換中の入力も作成時間のうち)
+// 開始時刻は変換中でも最初のキー入力にする (変換中の入力も作成時間のうち)。
+// どちらが癖を見るのに向くかまだ決めきれないので、変換中も含む履歴 (rawSnapshots) も
+// 同じ間隔で並行して残し、後から比べられるようにしている
 export function recordInput(
 	session: DraftSession | undefined,
 	now: number,
@@ -47,6 +50,7 @@ export function recordInput(
 			text,
 			// 変換中に始まった下書きは、最初の履歴を確定後の observeText に任せる
 			snapshots: composing ? [] : [{ at: 0, text }],
+			rawSnapshots: [{ at: 0, text }],
 		};
 	}
 	return {
@@ -66,22 +70,35 @@ const appendSnapshot = (
 		? [...snapshots]
 		: [...snapshots, { at, text }];
 
+// 間隔が来ていれば履歴に追加する。直前の履歴が無ければすぐ取る
+const snapshotIfDue = (
+	snapshots: Snapshot[],
+	at: number,
+	text: string,
+): Snapshot[] => {
+	const last = snapshots.at(-1);
+	const due = !last || at - last.at >= SNAPSHOT_INTERVAL_MS;
+	return due ? appendSnapshot(snapshots, at, text) : snapshots;
+};
+
 // 入力欄の現在の全文を観測する。input イベント以外 (補完など) での変化もここで拾う。
-// 変換中は履歴を見送り、確定後の最初の観測で取る (間隔はそのとき改めて判定する)
+// 確定だけの履歴は、変換中は見送って確定後の最初の観測で取る (間隔はそのとき改めて判定する)。
+// 変換中も含む履歴は、変換中かどうかに関係なく間隔どおりに取る
 export function observeText(
 	session: DraftSession,
 	now: number,
 	text: string,
 	composing = false,
 ): DraftSession {
-	if (composing) return { ...session, text };
 	const at = now - session.startedAt;
-	const last = session.snapshots.at(-1);
-	const due = !last || at - last.at >= SNAPSHOT_INTERVAL_MS;
-	const snapshots = due
-		? appendSnapshot(session.snapshots, at, text)
-		: session.snapshots;
-	return { ...session, text, snapshots };
+	return {
+		...session,
+		text,
+		snapshots: composing
+			? session.snapshots
+			: snapshotIfDue(session.snapshots, at, text),
+		rawSnapshots: snapshotIfDue(session.rawSnapshots, at, text),
+	};
 }
 
 // 入力欄が空になったのを観測した時点で呼ぶ。直前に送信操作があれば送信とみなす
@@ -111,5 +128,10 @@ export function closeSession(
 		text: session.text,
 		// 最終形も履歴の末尾に入れて、間隔の途中で終わった分を取りこぼさない
 		snapshots: appendSnapshot(session.snapshots, durationMs, session.text),
+		rawSnapshots: appendSnapshot(
+			session.rawSnapshots,
+			durationMs,
+			session.text,
+		),
 	};
 }
