@@ -6,7 +6,46 @@ export const SELECTORS = {
 	sendButton: '[data-qa="texty_send_button"]',
 	threadPane: '[data-qa="threads_flexpane"], .p-threads_flexpane',
 	messageTs: "[data-msg-ts]",
+	teamName: ".p-ia4_home_header_menu__team_name",
+	channelHeaderName: '[data-qa="channel_name"]',
+	sidebarChannelName: ".p-channel_sidebar__name",
 } as const;
+
+const sidebarChannel = (channelId: string) =>
+	`[data-qa-channel-sidebar-channel-id="${CSS.escape(channelId)}"]`;
+
+const nonEmpty = (s: string | null | undefined): string | undefined =>
+	s?.trim() || undefined;
+
+// 例: "kuranari（DM） - kuranari - Slack" → "kuranari"
+// 先頭のチャンネル名側に " - " が含まれても崩れないよう、末尾から数える
+export function teamNameFromTitle(title: string): string | undefined {
+	const parts = title.split(" - ");
+	return parts.length >= 3 && parts.at(-1) === "Slack"
+		? nonEmpty(parts.at(-2))
+		: undefined;
+}
+
+export function readTeamName(doc: Document = document): string | undefined {
+	return (
+		nonEmpty(doc.querySelector(SELECTORS.teamName)?.textContent) ??
+		teamNameFromTitle(doc.title)
+	);
+}
+
+// サイドバーは ID で引けるので取り違えが無い。サイドバーに無いチャンネル (未参加や
+// 折りたたみ) はヘッダーで補うが、ヘッダーは「いま開いている」チャンネルの名前なので、
+// 呼び出し側は channelId が現在の URL のものであることを保証すること
+export function readChannelName(
+	channelId: string,
+	doc: Document = document,
+): string | undefined {
+	const item = doc.querySelector(sidebarChannel(channelId));
+	return (
+		nonEmpty(item?.querySelector(SELECTORS.sidebarChannelName)?.textContent) ??
+		nonEmpty(doc.querySelector(SELECTORS.channelHeaderName)?.textContent)
+	);
+}
 
 export type Location = {
 	teamId: string;

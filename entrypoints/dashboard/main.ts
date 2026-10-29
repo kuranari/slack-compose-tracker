@@ -82,7 +82,7 @@ const renderDay = (day: string, records: ComposeRecord[]) => {
 			el("td", row.duration, "num"),
 			outcomeCell,
 			el("td", PANE_LABEL[row.pane], "col-pane"),
-			el("td", row.channelId, "col-channel channel"),
+			el("td", row.channel, "col-channel channel"),
 			row.excerpt === ""
 				? el("td", "(本文なし)", "excerpt blank")
 				: el("td", row.excerpt, "excerpt"),
@@ -202,6 +202,10 @@ const renderStepList = () => {
 	$("step-list").replaceChildren(...items);
 };
 
+// 詳細では名前と ID を併記する (同名チャンネルの見分けや Slack 側での検索用)
+const withId = (name: string | undefined, id: string) =>
+	name ? `${name} (${id})` : id;
+
 const renderMeta = (r: ComposeRecord) => {
 	const entries: [string, string][] = [
 		["開始", formatDateTime(r.startedAt)],
@@ -209,8 +213,8 @@ const renderMeta = (r: ComposeRecord) => {
 		["所要時間", formatDuration(r.durationMs)],
 		["結果", OUTCOME_LABEL[r.outcome]],
 		["場所", PANE_LABEL[r.pane]],
-		["チーム", r.teamId],
-		["チャンネル", r.channelId],
+		["チーム", withId(r.teamName, r.teamId)],
+		["チャンネル", withId(r.channelName, r.channelId)],
 		...(r.threadTs ? [["スレッド", r.threadTs] as [string, string]] : []),
 		["入力回数", `${r.inputCount} 回`],
 		["文字数", `${r.length} 文字`],

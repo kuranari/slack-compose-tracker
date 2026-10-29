@@ -2,6 +2,7 @@
 import {
 	type ComposeOutcome,
 	type ComposeRecord,
+	channelLabel,
 	type Pane,
 	summarize,
 } from "@/lib/compose-record";
@@ -14,7 +15,8 @@ export type DayRow = {
 	duration: string;
 	outcome: ComposeOutcome;
 	pane: Pane;
-	channelId: string;
+	// 名前が無い記録 (初期版や取得失敗) は ID で代用する
+	channel: string;
 	excerpt: string;
 };
 
@@ -62,7 +64,7 @@ export function toDayRows(records: readonly ComposeRecord[]): DayRow[] {
 		duration: formatDuration(r.durationMs),
 		outcome: r.outcome,
 		pane: r.pane,
-		channelId: r.channelId,
+		channel: channelLabel(r),
 		// 初期版の記録には text が無い
 		excerpt: excerpt(r.text ?? ""),
 	}));

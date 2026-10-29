@@ -74,7 +74,7 @@ describe("renderReport", () => {
 		expect(report).toContain("- 期間: t1700000000000 〜 t1700000100000 / 2 件");
 		expect(report).toContain("| スレッド | 1 |");
 		expect(report).toContain("書き直しの多い下書き (削除文字数の上位 1 件)");
-		expect(report).toContain("### #1 t1700000100000 送信 / スレッド");
+		expect(report).toContain("### #1 t1700000100000 送信 / C1 のスレッド");
 		expect(report).toContain("[-明日-]{+今週+}やります");
 	});
 

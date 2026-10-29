@@ -49,6 +49,9 @@ test("チャンネルで入力するとバッジが出て、送信すると記�
 		length: text.length,
 		text,
 	});
+	// 名前は Slack の表示から読むので、ワークスペースに依存しない形で「取れていること」だけ確かめる
+	expect(record?.teamName).toMatch(/\S/);
+	expect(record?.channelName).toMatch(/\S/);
 	expect(record).not.toHaveProperty("threadTs");
 	await expect(badges(page)).toHaveCount(0);
 });

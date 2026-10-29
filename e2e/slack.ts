@@ -1,6 +1,6 @@
 // 本物の Slack を操作するヘルパー。拡張側のセレクタ (lib/slack-dom.ts) を流用し、
 // テスト専用に必要なものだけここで足す
-import type { Locator, Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { SELECTORS } from "@/lib/slack-dom";
 
 // チャンネル側の入力欄はメッセージペインの下部にある (スレッドペインの入力欄と区別するため)
@@ -50,8 +50,16 @@ export async function openThreadOf(page: Page, text: string): Promise<void> {
 		.locator(SELECTORS.messageTs)
 		.filter({ hasText: text })
 		.last();
-	await message.hover();
+	// 送信直後はメッセージの描画やホバー時のツールバーが遅れることがあるので、
+	// ボタンが出るまでホバーし直す (一度だけのホバーだとまれに 1 分待って落ちていた)
+	await expect(async () => {
+		await message.hover();
+		await expect(message.locator(START_THREAD)).toBeVisible({
+			timeout: 2_000,
+		});
+	}).toPass({ timeout: 20_000 });
 	await message.locator(START_THREAD).click();
+	await expect(threadComposer(page)).toBeVisible();
 }
 
 // スレッドペイン先頭 (親メッセージ) の ts。拡張が記録する threadTs と一致するはず

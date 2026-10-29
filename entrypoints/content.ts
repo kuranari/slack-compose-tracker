@@ -1,3 +1,4 @@
+import type { ComposeRecord } from "@/lib/compose-record";
 import {
 	closeSession,
 	type DraftContext,
@@ -17,6 +18,8 @@ import {
 	isInThreadPane,
 	isSendButton,
 	parseLocation,
+	readChannelName,
+	readTeamName,
 	threadRootTs,
 } from "@/lib/slack-dom";
 
@@ -64,7 +67,20 @@ export default defineContentScript({
 			if (key) pendingSends.set(key, Date.now());
 		};
 
-		const save = (record: ReturnType<typeof closeSession>) => {
+		// 締めるのは入力欄が見えているとき、つまりそのチャンネルを開いているときなので、
+		// ヘッダーから読むチャンネル名もこの記録のものになる
+		const withNames = (record: ComposeRecord): ComposeRecord => {
+			const teamName = readTeamName();
+			const channelName = readChannelName(record.channelId);
+			return {
+				...record,
+				...(teamName && { teamName }),
+				...(channelName && { channelName }),
+			};
+		};
+
+		const save = (closed: ComposeRecord) => {
+			const record = withNames(closed);
 			// 本文はコンソールに出さない
 			const { text: _text, snapshots: _snapshots, ...meta } = record;
 			log(record.outcome, meta);

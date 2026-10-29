@@ -43,8 +43,8 @@ describe("dayKey", () => {
 describe("toCsv", () => {
 	it("ヘッダと行を出力し、スレッドでなければ threadTs は空欄", () => {
 		expect(toCsv([record()]).split("\n")).toEqual([
-			"startedAt,endedAt,durationSec,outcome,pane,teamId,channelId,threadTs,length,inputCount,text",
-			"2026-10-29T10:00:00.000Z,2026-10-29T10:01:30.000Z,90,sent,channel,T1,C1,,5,12,hello",
+			"startedAt,endedAt,durationSec,outcome,pane,teamId,teamName,channelId,channelName,threadTs,length,inputCount,text",
+			"2026-10-29T10:00:00.000Z,2026-10-29T10:01:30.000Z,90,sent,channel,T1,,C1,,,5,12,hello",
 		]);
 	});
 

@@ -13,6 +13,9 @@ export type Snapshot = {
 export type ComposeRecord = {
 	teamId: string;
 	channelId: string;
+	// 下書きを締めた時点の表示名。取れなかった場合や初期版の記録には無い
+	teamName?: string;
+	channelName?: string;
 	threadTs?: string;
 	pane: Pane;
 	startedAt: number;
@@ -43,6 +46,11 @@ export function summarize(records: readonly ComposeRecord[]): Summary {
 	);
 }
 
+// 表示用。名前が無ければ ID で代用する
+export const teamLabel = (r: ComposeRecord): string => r.teamName ?? r.teamId;
+export const channelLabel = (r: ComposeRecord): string =>
+	r.channelName ?? r.channelId;
+
 // ローカル時刻での日付 (例: "2026-10-30")。保存キーと「今日」の判定に使う
 export function dayKey(timestamp: number): string {
 	const d = new Date(timestamp);
@@ -57,7 +65,9 @@ const CSV_COLUMNS = [
 	"outcome",
 	"pane",
 	"teamId",
+	"teamName",
 	"channelId",
+	"channelName",
 	"threadTs",
 	"length",
 	"inputCount",
@@ -79,7 +89,9 @@ export function toCsv(records: readonly ComposeRecord[]): string {
 			r.outcome,
 			r.pane,
 			r.teamId,
+			r.teamName,
 			r.channelId,
+			r.channelName,
 			r.threadTs,
 			r.length,
 			r.inputCount,

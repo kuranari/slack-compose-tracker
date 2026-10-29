@@ -67,7 +67,7 @@ describe("toDayRows", () => {
 				duration: "12:34",
 				outcome: "sent",
 				pane: "thread",
-				channelId: "C1",
+				channel: "C1",
 				excerpt: "長い 本文",
 			},
 			{
@@ -76,7 +76,7 @@ describe("toDayRows", () => {
 				duration: "1:30",
 				outcome: "discarded",
 				pane: "channel",
-				channelId: "C2",
+				channel: "C2",
 				excerpt: "hello",
 			},
 		]);

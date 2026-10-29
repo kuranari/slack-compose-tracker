@@ -149,8 +149,10 @@ const summaryTable = (groups: readonly GroupStats[]): string[] => [
 
 const outcomeLabel = (r: ComposeRecord) =>
 	r.outcome === "sent" ? "送信" : "破棄";
+// lib/compose-record.ts の channelLabel と同じ。analysis/ は Node で直接動かすため
+// lib の値は import できず (lib 側が @/ エイリアスを使う)、型だけを共有している
 const paneLabel = (r: ComposeRecord) =>
-	r.pane === "channel" ? "チャンネル" : "スレッド";
+	`${r.channelName ?? r.channelId} の${r.pane === "channel" ? "チャンネル" : "スレッド"}`;
 
 const ranking = (
 	drafts: readonly Draft[],
