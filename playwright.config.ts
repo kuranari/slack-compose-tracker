@@ -28,7 +28,9 @@ export default defineConfig({
 		{
 			name: "e2e",
 			testMatch: "*.spec.ts",
-			use: { headless: process.env.E2E_HEADLESS === "1" },
+			// 画面を出すとウィンドウとフォーカスを奪って作業の邪魔になるので、既定はヘッドレス。
+			// 動きを目で追いたいときだけ E2E_HEADED=1 で画面を出す
+			use: { headless: process.env.E2E_HEADED !== "1" },
 		},
 	],
 });
