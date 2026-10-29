@@ -24,3 +24,15 @@ web-ext.config.ts
 *.njsproj
 *.sln
 *.sw?
+
+# env
+.env
+
+# e2e
+e2e-profile
+test-results
+playwright-report
+blob-report
+
+# 書き出した記録 (本文を含む)
+data

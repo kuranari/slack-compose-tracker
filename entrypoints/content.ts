@@ -3,6 +3,7 @@ import {
 	type DraftContext,
 	type DraftSession,
 	draftKey,
+	observeText,
 	recordInput,
 } from "@/lib/draft-session";
 import { formatDuration } from "@/lib/duration";
@@ -64,7 +65,9 @@ export default defineContentScript({
 		};
 
 		const save = (record: ReturnType<typeof closeSession>) => {
-			log(record.outcome, record);
+			// 本文はコンソールに出さない
+			const { text: _text, snapshots: _snapshots, ...meta } = record;
+			log(record.outcome, meta);
 			browser.runtime
 				.sendMessage(saveRecordMessage(record))
 				.catch((err: unknown) => warn("save failed", String(err)));
@@ -81,7 +84,7 @@ export default defineContentScript({
 				if (!text) return;
 				const key = draftKey(c);
 				const prev = sessions.get(key);
-				sessions.set(key, recordInput(prev, Date.now(), text.length));
+				sessions.set(key, recordInput(prev, Date.now(), text));
 				if (!prev) log("start", c);
 			},
 			{ capture: true },
@@ -117,16 +120,18 @@ export default defineContentScript({
 			const items = [];
 			for (const composer of findComposers()) {
 				const c = contextOf(composer);
-				const session = c && sessions.get(draftKey(c));
-				if (!c || !session) continue;
-				if (composerText(composer)) {
+				const key = c && draftKey(c);
+				const session = key && sessions.get(key);
+				if (!c || !key || !session) continue;
+				const text = composerText(composer);
+				if (text) {
+					sessions.set(key, observeText(session, now, text));
 					items.push({
 						composer,
 						text: formatDuration(now - session.startedAt),
 					});
 					continue;
 				}
-				const key = draftKey(c);
 				sessions.delete(key);
 				save(closeSession(session, c, now, pendingSends.get(key)));
 				pendingSends.delete(key);

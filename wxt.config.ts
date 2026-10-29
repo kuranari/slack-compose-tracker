@@ -7,6 +7,7 @@ export default defineConfig({
 	manifest: {
 		name: "Slack Compose Tracker",
 		description: "Slackメッセージ作成時間トラッカー",
-		permissions: ["storage"],
+		// 本文と文字の履歴を残すため storage.local の 10MB 上限を外す
+		permissions: ["storage", "unlimitedStorage"],
 	},
 });

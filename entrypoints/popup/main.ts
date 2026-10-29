@@ -1,7 +1,7 @@
 import "./style.css";
-import { startOfDay, summarize, toCsv } from "@/lib/compose-record";
+import { dayKey, summarize, toCsv, toJsonl } from "@/lib/compose-record";
 import { formatDuration } from "@/lib/duration";
-import { getRecords } from "@/lib/record-store";
+import { getAllRecords, getRecordsOfDay } from "@/lib/record-store";
 
 const setText = (id: string, text: string) => {
 	const el = document.getElementById(id);
@@ -23,25 +23,22 @@ const dateStamp = (now: number) => {
 	return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
 };
 
-const records = await getRecords();
 const now = Date.now();
-const today = summarize(
-	records.filter((r) => r.outcome === "sent" && r.endedAt >= startOfDay(now)),
-);
+const todayRecords = await getRecordsOfDay(dayKey(now));
+const today = summarize(todayRecords.filter((r) => r.outcome === "sent"));
 
 setText("count", `${today.count} 件`);
 setText("total", formatDuration(today.totalMs));
 setText("longest", formatDuration(today.longestMs));
-setText("all-count", `保存済みの記録: ${records.length} 件 (破棄を含む)`);
+setText("all-count", `今日の記録: ${todayRecords.length} 件 (破棄を含む)`);
 
+// 書き出しは全期間。JSONL は 1 行 1 下書きで文字の履歴を含む (AI と分析する用)
 const filename = `slack-compose-records-${dateStamp(now)}`;
-document.getElementById("export-json")?.addEventListener("click", () => {
-	download(
-		`${filename}.json`,
-		"application/json",
-		JSON.stringify(records, null, 2),
-	);
+document.getElementById("export-jsonl")?.addEventListener("click", async () => {
+	const records = await getAllRecords();
+	download(`${filename}.jsonl`, "application/x-ndjson", toJsonl(records));
 });
-document.getElementById("export-csv")?.addEventListener("click", () => {
+document.getElementById("export-csv")?.addEventListener("click", async () => {
+	const records = await getAllRecords();
 	download(`${filename}.csv`, "text/csv", toCsv(records));
 });

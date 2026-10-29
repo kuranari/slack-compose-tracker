@@ -4,6 +4,12 @@ export type Pane = "channel" | "thread";
 
 export type ComposeOutcome = "sent" | "discarded";
 
+// 下書き開始からの経過 ms と、その時点の全文
+export type Snapshot = {
+	at: number;
+	text: string;
+};
+
 export type ComposeRecord = {
 	teamId: string;
 	channelId: string;
@@ -15,6 +21,9 @@ export type ComposeRecord = {
 	inputCount: number;
 	length: number;
 	outcome: ComposeOutcome;
+	// 送信または破棄の直前に入力欄にあった全文
+	text: string;
+	snapshots: Snapshot[];
 };
 
 export type Summary = {
@@ -34,10 +43,11 @@ export function summarize(records: readonly ComposeRecord[]): Summary {
 	);
 }
 
-export function startOfDay(now: number): number {
-	const d = new Date(now);
-	d.setHours(0, 0, 0, 0);
-	return d.getTime();
+// ローカル時刻での日付 (例: "2026-10-30")。保存キーと「今日」の判定に使う
+export function dayKey(timestamp: number): string {
+	const d = new Date(timestamp);
+	const pad = (n: number) => String(n).padStart(2, "0");
+	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 const CSV_COLUMNS = [
@@ -51,13 +61,15 @@ const CSV_COLUMNS = [
 	"threadTs",
 	"length",
 	"inputCount",
+	"text",
 ] as const;
 
 const csvCell = (value: string | number | undefined): string => {
 	const s = value === undefined ? "" : String(value);
-	return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
+	return /[",\r\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
 };
 
+// 文字の履歴 (snapshots) は列にしづらいので CSV には含めない。分析には JSONL を使う
 export function toCsv(records: readonly ComposeRecord[]): string {
 	const rows = records.map((r) =>
 		[
@@ -71,9 +83,14 @@ export function toCsv(records: readonly ComposeRecord[]): string {
 			r.threadTs,
 			r.length,
 			r.inputCount,
+			r.text,
 		]
 			.map(csvCell)
 			.join(","),
 	);
 	return [CSV_COLUMNS.join(","), ...rows].join("\n");
+}
+
+export function toJsonl(records: readonly ComposeRecord[]): string {
+	return records.map((r) => JSON.stringify(r)).join("\n");
 }
