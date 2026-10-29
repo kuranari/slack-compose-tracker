@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>記録一覧 - Slack Compose Tracker</title>
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Slack Compose Tracker</h1>
+    </header>
+    <main>
+      <section id="day-view" aria-labelledby="day-heading" hidden>
+        <h2 id="day-heading" class="visually-hidden">日別の記録</h2>
+        <nav class="day-nav" aria-label="日付の選択">
+          <button type="button" id="prev-day">← 前日</button>
+          <label class="day-input">
+            <span class="visually-hidden">日付</span>
+            <input type="date" id="day-input" required />
+          </label>
+          <button type="button" id="next-day">翌日 →</button>
+          <button type="button" id="today">今日</button>
+        </nav>
+
+        <dl class="summary">
+          <div>
+            <dt>送信</dt>
+            <dd id="sum-sent">-</dd>
+          </div>
+          <div>
+            <dt>合計 (送信)</dt>
+            <dd id="sum-total">-</dd>
+          </div>
+          <div>
+            <dt>最長 (送信)</dt>
+            <dd id="sum-longest">-</dd>
+          </div>
+          <div>
+            <dt>破棄</dt>
+            <dd id="sum-discarded">-</dd>
+          </div>
+        </dl>
+
+        <div class="table-wrap">
+          <table class="records">
+            <caption id="records-caption" class="visually-hidden"></caption>
+            <thead>
+              <tr>
+                <th scope="col">開始</th>
+                <th scope="col">時間</th>
+                <th scope="col">結果</th>
+                <th scope="col" class="col-pane">場所</th>
+                <th scope="col" class="col-channel">チャンネル</th>
+                <th scope="col">本文</th>
+              </tr>
+            </thead>
+            <tbody id="record-rows"></tbody>
+          </table>
+        </div>
+        <p id="empty" class="empty" hidden>この日の記録はありません。</p>
+      </section>
+
+      <section id="detail-view" aria-labelledby="detail-heading" hidden>
+        <p class="back"><a id="back-link" href="#/">← 一覧に戻る</a></p>
+        <h2 id="detail-heading">記録の詳細</h2>
+        <p id="not-found" class="empty" hidden>
+          記録が見つかりませんでした。
+        </p>
+
+        <div id="detail-body">
+          <dl id="detail-meta" class="meta"></dl>
+
+          <h3>最終テキスト</h3>
+          <pre id="final-text" class="text-block"></pre>
+
+          <h3>リプレイ</h3>
+          <div class="replay-controls">
+            <button type="button" id="play" aria-pressed="false">▶ 再生</button>
+            <label class="slider">
+              <span class="visually-hidden">ステップ</span>
+              <input type="range" id="step-slider" min="0" max="0" value="0" />
+            </label>
+            <output id="step-label" for="step-slider" aria-live="polite"></output>
+          </div>
+          <p class="legend">
+            <ins>追加</ins> <del>削除</del>
+            <span class="note">(直前のステップとの差分)</span>
+          </p>
+          <pre id="step-text" class="text-block diff"></pre>
+
+          <h3>ステップ一覧</h3>
+          <ol id="step-list" class="step-list"></ol>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
