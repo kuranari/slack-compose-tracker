@@ -42,3 +42,7 @@ document.getElementById("export-csv")?.addEventListener("click", async () => {
 	const records = await getAllRecords();
 	download(`${filename}.csv`, "text/csv", toCsv(records));
 });
+// 一覧や文字の履歴はポップアップには収まらないので、別タブのダッシュボードで見る
+document.getElementById("open-dashboard")?.addEventListener("click", () => {
+	void browser.tabs.create({ url: browser.runtime.getURL("/dashboard.html") });
+});
