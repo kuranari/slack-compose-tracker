@@ -5,6 +5,10 @@ import type { ComposeRecord, Pane, Snapshot } from "@/lib/compose-record";
 // 送信操作から入力欄が空になるまでの猶予。これを過ぎて空になったら破棄とみなす
 export const SEND_WINDOW_MS = 3_000;
 
+// これより短く終わった破棄は記録しない。打ち始めてすぐ消した「あ」や「＠」のような断片で、
+// 作成時間の分析には使えずノイズになるため
+export const MIN_DISCARD_MS = 3_000;
+
 // 書き直しの癖を後から分析するための文字の履歴の間隔
 export const SNAPSHOT_INTERVAL_MS = 10_000;
 
@@ -134,4 +138,8 @@ export function closeSession(
 			session.text,
 		),
 	};
+}
+
+export function shouldSave(record: ComposeRecord): boolean {
+	return record.outcome === "sent" || record.durationMs >= MIN_DISCARD_MS;
 }

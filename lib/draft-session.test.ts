@@ -3,10 +3,12 @@ import {
 	closeSession,
 	type DraftContext,
 	draftKey,
+	MIN_DISCARD_MS,
 	observeText,
 	recordInput,
 	SEND_WINDOW_MS,
 	SNAPSHOT_INTERVAL_MS,
+	shouldSave,
 } from "@/lib/draft-session";
 
 const channel: DraftContext = {
@@ -196,5 +198,34 @@ describe("closeSession", () => {
 		const unchanged = recordInput(undefined, 1_000, "a");
 		const record = closeSession(unchanged, channel, 2_000, 1_500);
 		expect(record.snapshots).toEqual([{ at: 0, text: "a" }]);
+	});
+});
+
+describe("shouldSave", () => {
+	const session = recordInput(undefined, 1_000, "あ");
+
+	it("すぐに消した破棄は残さない", () => {
+		const record = closeSession(
+			session,
+			thread,
+			1_000 + MIN_DISCARD_MS - 1,
+			undefined,
+		);
+		expect(shouldSave(record)).toBe(false);
+	});
+
+	it("しばらく書いてから消した破棄は残す", () => {
+		const record = closeSession(
+			session,
+			thread,
+			1_000 + MIN_DISCARD_MS,
+			undefined,
+		);
+		expect(shouldSave(record)).toBe(true);
+	});
+
+	it("送信はすぐでも残す", () => {
+		const record = closeSession(session, thread, 1_600, 1_500);
+		expect(shouldSave(record)).toBe(true);
 	});
 });

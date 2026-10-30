@@ -82,13 +82,27 @@ export function isInThreadPane(composer: HTMLElement): boolean {
 	return composer.closest(SELECTORS.threadPane) !== null;
 }
 
+const threadRootMessage = (composer: HTMLElement): Element | null =>
+	composer.closest(SELECTORS.threadPane)?.querySelector(SELECTORS.messageTs) ??
+	null;
+
 // スレッドを開いても URL は変わらないため、スレッドペイン先頭のメッセージ (親) の ts を使う
 export function threadRootTs(composer: HTMLElement): string | undefined {
-	const pane = composer.closest(SELECTORS.threadPane);
-	return (
-		pane?.querySelector(SELECTORS.messageTs)?.getAttribute("data-msg-ts") ??
-		undefined
+	return threadRootMessage(composer)?.getAttribute("data-msg-ts") ?? undefined;
+}
+
+// アクティビティや検索の画面では、URL のチャンネルの位置に "activity-inbox" などが入る。
+// Slack の下書きはスレッドごとに 1 つで、どの画面から開いても同じものが出るので、
+// 親メッセージのチャンネル ID を使い、画面によらず同じ下書きとして扱う
+export function threadRootChannelId(composer: HTMLElement): string | undefined {
+	return nonEmpty(
+		threadRootMessage(composer)?.getAttribute("data-msg-channel-id"),
 	);
+}
+
+// 例: /client/T1/activity-inbox/thread/C1-1700000000.000100 → "C1"
+export function threadChannelIdFromPath(pathname: string): string | undefined {
+	return pathname.match(/\/thread\/([^-/]+)-\d+\.\d+/)?.[1];
 }
 
 export function isSendButton(target: EventTarget | null): boolean {

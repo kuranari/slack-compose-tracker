@@ -6,6 +6,7 @@ import {
 	draftKey,
 	observeText,
 	recordInput,
+	shouldSave,
 } from "@/lib/draft-session";
 import { formatDuration } from "@/lib/duration";
 import { createBadgeLayer } from "@/lib/elapsed-badge";
@@ -20,6 +21,8 @@ import {
 	parseLocation,
 	readChannelName,
 	readTeamName,
+	threadChannelIdFromPath,
+	threadRootChannelId,
 	threadRootTs,
 } from "@/lib/slack-dom";
 
@@ -54,7 +57,16 @@ export default defineContentScript({
 				return { teamId, channelId, pane: "channel" };
 			}
 			const threadTs = threadRootTs(composer);
-			return threadTs ? { teamId, channelId, threadTs, pane: "thread" } : null;
+			if (!threadTs) return null;
+			return {
+				teamId,
+				channelId:
+					threadRootChannelId(composer) ??
+					threadChannelIdFromPath(location.pathname) ??
+					channelId,
+				threadTs,
+				pane: "thread",
+			};
 		};
 
 		const keyOf = (composer: HTMLElement | null) => {
@@ -176,7 +188,8 @@ export default defineContentScript({
 					continue;
 				}
 				sessions.delete(key);
-				save(closeSession(session, c, now, pendingSends.get(key)));
+				const record = closeSession(session, c, now, pendingSends.get(key));
+				if (shouldSave(record)) save(record);
 				pendingSends.delete(key);
 			}
 			badges.render(items);
