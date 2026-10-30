@@ -2,6 +2,7 @@
 // セレクタが壊れたときに直す場所を 1 か所に限定するため。
 
 export const SELECTORS = {
+	messageInput: '[data-qa="message_input"]',
 	composer: '[data-qa="message_input"] [contenteditable="true"]',
 	sendButton: '[data-qa="texty_send_button"]',
 	threadPane: '[data-qa="threads_flexpane"], .p-threads_flexpane',
@@ -80,6 +81,14 @@ export function closestComposer(
 
 export function isInThreadPane(composer: HTMLElement): boolean {
 	return composer.closest(SELECTORS.threadPane) !== null;
+}
+
+// 入力欄の入れ物は、どの画面でも送信先の会話の ID を data-channel-id に持つ (2026-10-30 確認)。
+// アクティビティ画面では URL が "/client/T…/activity-inbox" のままで、選んだ会話が中央に開く
+export function composerChannelId(composer: HTMLElement): string | undefined {
+	return nonEmpty(
+		composer.closest(SELECTORS.messageInput)?.getAttribute("data-channel-id"),
+	);
 }
 
 const threadRootMessage = (composer: HTMLElement): Element | null =>

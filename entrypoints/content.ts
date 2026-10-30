@@ -13,6 +13,7 @@ import { createBadgeLayer } from "@/lib/elapsed-badge";
 import { saveRecordMessage } from "@/lib/messages";
 import {
 	closestComposer,
+	composerChannelId,
 	composerForSendButton,
 	composerText,
 	findComposers,
@@ -52,7 +53,10 @@ export default defineContentScript({
 		const contextOf = (composer: HTMLElement): DraftContext | null => {
 			const loc = parseLocation(location.pathname);
 			if (!loc) return null;
-			const { teamId, channelId } = loc;
+			const { teamId } = loc;
+			// アクティビティや検索の画面では、URL のチャンネルの位置に "activity-inbox" などが入る。
+			// 下書きは送信先の会話ごとに 1 つなので、画面によらず会話の ID で扱う
+			const channelId = composerChannelId(composer) ?? loc.channelId;
 			if (!isInThreadPane(composer)) {
 				return { teamId, channelId, pane: "channel" };
 			}
@@ -61,9 +65,10 @@ export default defineContentScript({
 			return {
 				teamId,
 				channelId:
+					composerChannelId(composer) ??
 					threadRootChannelId(composer) ??
 					threadChannelIdFromPath(location.pathname) ??
-					channelId,
+					loc.channelId,
 				threadTs,
 				pane: "thread",
 			};
