@@ -1,4 +1,5 @@
-import { SEND_WINDOW_MS } from "@/lib/draft-session";
+import type { Page } from "@playwright/test";
+import { MIN_DISCARD_MS, SEND_WINDOW_MS } from "@/lib/draft-session";
 import { clearRecords, expect, readRecords, SLACK_URL, test } from "./fixtures";
 import {
 	badges,
@@ -18,6 +19,20 @@ const SEND_KEY = "ControlOrMeta+Enter";
 const BADGE_TEXT = /^\d+:\d{2}$/;
 
 const uniqueText = (label: string) => `e2e ${label} ${Date.now()}`;
+
+// バッジ ("m:ss") の経過時間が ms 以上になるまで待つ。MIN_DISCARD_MS 未満の破棄は
+// 記録されないので、破棄を確かめるテストは下書きをこれ以上続けてから消す
+const waitElapsed = async (page: Page, ms: number) => {
+	const elapsedMs = async () => {
+		const [m = 0, s = 0] = (await badges(page).first().textContent())
+			?.split(":")
+			.map(Number) ?? [0, 0];
+		return (m * 60 + s) * 1000;
+	};
+	await expect
+		.poll(elapsedMs, { timeout: ms + 10_000 })
+		.toBeGreaterThanOrEqual(ms);
+};
 
 test.beforeEach(async ({ page, serviceWorker }) => {
 	await page.goto(SLACK_URL);
@@ -60,12 +75,30 @@ test("全文を消すと破棄として記録される", async ({ page, serviceW
 	const composer = channelComposer(page);
 	await composer.pressSequentially(uniqueText("discard"));
 	await expect(badges(page)).toHaveCount(1);
+	await waitElapsed(page, MIN_DISCARD_MS);
 
 	await clearComposer(composer);
 
 	await expect.poll(() => readRecords(serviceWorker)).toHaveLength(1);
 	const [record] = await readRecords(serviceWorker);
 	expect(record?.outcome).toBe("discarded");
+	expect(record?.durationMs).toBeGreaterThanOrEqual(MIN_DISCARD_MS);
+});
+
+test("打ち始めてすぐ消した破棄は記録しない", async ({
+	page,
+	serviceWorker,
+}) => {
+	const composer = channelComposer(page);
+	await composer.pressSequentially("あ");
+	await expect(badges(page)).toHaveCount(1);
+
+	await clearComposer(composer);
+	await expect(badges(page)).toHaveCount(0);
+
+	// 下書きを締める定期チェック (500ms ごと) が何度か走るのを待ってから確かめる
+	await page.waitForTimeout(1_500);
+	expect(await readRecords(serviceWorker)).toHaveLength(0);
 });
 
 test("スレッドで送信ボタンを押すと threadTs 付きで記録される", async ({
@@ -119,6 +152,9 @@ test.describe("日本語入力 (IME)", () => {
 
 		await ime.setComposition("にほんご");
 		await expect(badges(page)).toHaveCount(1);
+		// 破棄として記録される長さにしておく。待つのは確定の Enter の前にして、
+		// Enter から消すまでは送信の猶予 (SEND_WINDOW_MS) 内に収める
+		await waitElapsed(page, MIN_DISCARD_MS);
 		await ime.pressConfirmEnter();
 		await ime.commit("日本語");
 		await ime.detach();
