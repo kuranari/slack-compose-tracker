@@ -124,8 +124,60 @@ export function composerForSendButton(
 	return null;
 }
 
-// Quill 系エディタは空でも "\n" を持つので trim して判定する
+// 絵文字の <img> が持つ表記の候補。どの属性に載るかは Slack の版で変わりうるので、
+// ":pray:" の形のものを優先し、無ければ最初に見つかった値 (Unicode の絵文字など) を使う
+const EMOJI_ATTRS = [
+	"data-stringify-emoji",
+	"data-stringify-text",
+	"data-id",
+	"alt",
+] as const;
+const SHORTCODE = /^:[^\s:]+:$/;
+
+export function emojiText(img: Pick<Element, "getAttribute">): string {
+	const values = EMOJI_ATTRS.map((attr) =>
+		img.getAttribute(attr)?.trim(),
+	).filter((v): v is string => !!v);
+	return values.find((v) => SHORTCODE.test(v)) ?? values[0] ?? "";
+}
+
+// innerText は描画されている要素でないと改行を正しく返さないので、複製を画面外に置いて読む。
+// Slack の入力欄そのものを書き換えると編集内容を壊しうるため、複製は自前の Shadow DOM に置く
+let measureRoot: HTMLElement | undefined;
+const getMeasureRoot = (): HTMLElement => {
+	if (measureRoot?.isConnected) return measureRoot;
+	const host = document.createElement("div");
+	host.style.cssText =
+		"position:fixed;top:0;left:-100000px;width:1000px;pointer-events:none;";
+	const root = document.createElement("div");
+	root.style.whiteSpace = "pre-wrap";
+	host.attachShadow({ mode: "open" }).append(root);
+	document.body.append(host);
+	measureRoot = root;
+	return root;
+};
+
+const innerTextWithEmoji = (composer: HTMLElement): string => {
+	const clone = composer.cloneNode(true) as HTMLElement;
+	clone.removeAttribute("contenteditable");
+	for (const img of clone.querySelectorAll("img")) {
+		img.replaceWith(emojiText(img));
+	}
+	getMeasureRoot().replaceChildren(clone);
+	try {
+		// biome-ignore lint/performance/useDomNodeTextContent: 下書きの改行を保持するため innerText を使う
+		return clone.innerText;
+	} finally {
+		clone.remove();
+	}
+};
+
+// Quill 系エディタは空でも "\n" を持つので trim して判定する。
+// 絵文字は <img> で描画されて innerText に出ないため、":pray:" のような表記に置き換えて読む
 export function composerText(composer: HTMLElement): string {
-	// biome-ignore lint/performance/useDomNodeTextContent: 下書きの改行を保持するため innerText を使う
-	return composer.innerText.replace(/\u200b/g, "").trim();
+	const text = composer.querySelector("img")
+		? innerTextWithEmoji(composer)
+		: // biome-ignore lint/performance/useDomNodeTextContent: 下書きの改行を保持するため innerText を使う
+			composer.innerText;
+	return text.replace(/\u200b/g, "").trim();
 }

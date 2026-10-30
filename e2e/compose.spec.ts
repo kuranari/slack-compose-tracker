@@ -94,6 +94,19 @@ test("スレッドで送信ボタンを押すと threadTs 付きで記録され�
 	});
 });
 
+test("絵文字は :name: の表記で本文に残る", async ({ page, serviceWorker }) => {
+	const text = uniqueText("emoji");
+	const composer = channelComposer(page);
+	// 閉じのコロンを打つと Slack が絵文字 (<img>) に置き換える
+	await composer.pressSequentially(`${text} :pray: `);
+	await expect(composer.locator("img")).toHaveCount(1);
+	await composer.press(SEND_KEY);
+
+	await expect.poll(() => readRecords(serviceWorker)).toHaveLength(1);
+	const [record] = await readRecords(serviceWorker);
+	expect(record?.text).toBe(`${text} :pray:`);
+});
+
 test.describe("日本語入力 (IME)", () => {
 	test("変換確定の Enter は送信操作とみなさない", async ({
 		page,
