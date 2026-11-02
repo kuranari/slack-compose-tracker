@@ -20,8 +20,13 @@ const nonEmpty = (s: string | null | undefined): string | undefined =>
 
 // 例: "kuranari（DM） - kuranari - Slack" → "kuranari"
 // 先頭のチャンネル名側に " - " が含まれても崩れないよう、末尾から数える
+// 未読があると "… - チーム - 4 個の新しいアイテム - Slack" のように件数が入るので除く
+const UNREAD_COUNT = /^\d+ (個の新しいアイテム|new items?)$/;
+
 export function teamNameFromTitle(title: string): string | undefined {
-	const parts = title.split(" - ");
+	const parts = title
+		.split(" - ")
+		.filter((part) => !UNREAD_COUNT.test(part.trim()));
 	return parts.length >= 3 && parts.at(-1) === "Slack"
 		? nonEmpty(parts.at(-2))
 		: undefined;

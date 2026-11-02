@@ -17,6 +17,15 @@ describe("teamNameFromTitle", () => {
 		expect(teamNameFromTitle("a - b - Acme - Slack")).toBe("Acme");
 	});
 
+	it("未読件数の区切りは飛ばす", () => {
+		expect(
+			teamNameFromTitle("general - Acme - 4 個の新しいアイテム - Slack"),
+		).toBe("Acme");
+		expect(teamNameFromTitle("general - Acme - 1 new item - Slack")).toBe(
+			"Acme",
+		);
+	});
+
 	it("形式が違えば取らない", () => {
 		expect(teamNameFromTitle("Slack")).toBeUndefined();
 		expect(teamNameFromTitle("foo - bar")).toBeUndefined();
