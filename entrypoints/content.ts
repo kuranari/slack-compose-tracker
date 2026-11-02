@@ -6,6 +6,7 @@ import {
 	draftKey,
 	observeText,
 	recordInput,
+	SEND_WINDOW_MS,
 	shouldSave,
 } from "@/lib/draft-session";
 import { formatDuration } from "@/lib/duration";
@@ -100,9 +101,29 @@ export default defineContentScript({
 			{ capture: true },
 		);
 
+		// 送信操作の後、送信の猶予の間だけ入力欄の変化を見張る。送信なら入力欄は空になるが、
+		// 補完 (絵文字・チャンネル・メンション) の確定では文字が残ったまま書き換わる。
+		// Slack は補完の確定で input イベントを出さず DOM を直接書き換えることがあるので
+		// (2026-11-02 に確認)、input ではなく DOM の変化で判定する
+		const watchAfterSend = (composer: HTMLElement, key: string) => {
+			const observer = new MutationObserver(() => {
+				if (composerText(composer)) pendingSends.delete(key);
+				observer.disconnect();
+			});
+			observer.observe(composer, {
+				childList: true,
+				subtree: true,
+				characterData: true,
+			});
+			ctx.setTimeout(() => observer.disconnect(), SEND_WINDOW_MS);
+			ctx.onInvalidated(() => observer.disconnect());
+		};
+
 		const markSend = (composer: HTMLElement | null) => {
 			const key = keyOf(composer);
-			if (key) pendingSends.set(key, Date.now());
+			if (!composer || !key) return;
+			pendingSends.set(key, Date.now());
+			watchAfterSend(composer, key);
 		};
 
 		// 締めるのは入力欄が見えているとき、つまりそのチャンネルを開いているときなので、
