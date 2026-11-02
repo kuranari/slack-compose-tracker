@@ -101,6 +101,24 @@ test("打ち始めてすぐ消した破棄は記録しない", async ({
 	expect(await readRecords(serviceWorker)).toHaveLength(0);
 });
 
+test("補完を Enter で確定してすぐ消しても、送信ではなく破棄になる", async ({
+	page,
+	serviceWorker,
+}) => {
+	const composer = channelComposer(page);
+	// ":pra" で絵文字の補完が開き、Enter で :pray: に確定する
+	await composer.pressSequentially(`${uniqueText("autocomplete")} :pra`);
+	await composer.press("Enter");
+	await expect(composer.locator("img")).toHaveCount(1);
+
+	// 送信の猶予 (SEND_WINDOW_MS) 内に消す
+	await clearComposer(composer);
+
+	await expect.poll(() => readRecords(serviceWorker)).toHaveLength(1);
+	const [record] = await readRecords(serviceWorker);
+	expect(record?.outcome).toBe("discarded");
+});
+
 test("スレッドで送信ボタンを押すと threadTs 付きで記録される", async ({
 	page,
 	serviceWorker,

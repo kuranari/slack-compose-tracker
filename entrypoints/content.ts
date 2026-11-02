@@ -137,6 +137,9 @@ export default defineContentScript({
 				const text = composerText(composer);
 				if (!text) return;
 				const key = draftKey(c);
+				// 送信なら Slack は input を出さずに入力欄を空にする。送信操作の後に文字が残る入力が
+				// 来たなら、その Enter は補完 (チャンネル・メンション・絵文字) の確定や改行だった
+				pendingSends.delete(key);
 				const prev = sessions.get(key);
 				sessions.set(
 					key,
