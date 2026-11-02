@@ -108,6 +108,9 @@ test("補完を Enter で確定してすぐ消しても、送信ではなく破�
 	const composer = channelComposer(page);
 	// ":pra" で絵文字の補完が開き、Enter で :pray: に確定する
 	await composer.pressSequentially(`${uniqueText("autocomplete")} :pra`);
+	// 破棄として記録される長さにしておく。待つのは Enter の前にして、
+	// Enter から消すまでは送信の猶予 (SEND_WINDOW_MS) 内に収める
+	await waitElapsed(page, MIN_DISCARD_MS);
 	await composer.press("Enter");
 	await expect(composer.locator("img")).toHaveCount(1);
 
