@@ -9,7 +9,7 @@ import {
 	SEND_WINDOW_MS,
 	shouldSave,
 } from "@/lib/draft-session";
-import { formatDuration } from "@/lib/duration";
+import { elapsedLevel, formatDuration } from "@/lib/duration";
 import { createBadgeLayer } from "@/lib/elapsed-badge";
 import { saveRecordMessage } from "@/lib/messages";
 import {
@@ -210,9 +210,11 @@ export default defineContentScript({
 						key,
 						observeText(session, now, text, composing.has(composer)),
 					);
+					const elapsed = now - session.startedAt;
 					items.push({
 						composer,
-						text: formatDuration(now - session.startedAt),
+						text: formatDuration(elapsed),
+						level: elapsedLevel(elapsed),
 					});
 					continue;
 				}

@@ -7,3 +7,15 @@ export function formatDuration(ms: number): string {
 	const pad = (n: number) => String(n).padStart(2, "0");
 	return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
+
+// 入力時間の目安。長引いていることに書きながら気づけるよう、バッジの色を段階的に変える
+export const WARN_MS = 5 * 60_000;
+export const OVER_MS = 10 * 60_000;
+
+export type ElapsedLevel = "normal" | "warn" | "over";
+
+export function elapsedLevel(ms: number): ElapsedLevel {
+	if (ms >= OVER_MS) return "over";
+	if (ms >= WARN_MS) return "warn";
+	return "normal";
+}

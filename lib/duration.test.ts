@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { formatDuration } from "@/lib/duration";
+import { elapsedLevel, formatDuration, OVER_MS, WARN_MS } from "@/lib/duration";
 
 it.each([
 	[0, "0:00"],
@@ -9,4 +9,14 @@ it.each([
 	[-1_000, "0:00"],
 ])("formatDuration(%i) → %s", (ms, expected) => {
 	expect(formatDuration(ms)).toBe(expected);
+});
+
+it.each([
+	[0, "normal"],
+	[WARN_MS - 1, "normal"],
+	[WARN_MS, "warn"],
+	[OVER_MS - 1, "warn"],
+	[OVER_MS, "over"],
+])("elapsedLevel(%i) → %s", (ms, expected) => {
+	expect(elapsedLevel(ms)).toBe(expected);
 });

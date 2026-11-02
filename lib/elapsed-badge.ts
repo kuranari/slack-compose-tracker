@@ -1,6 +1,7 @@
 // 入力欄の右上に経過時間を重ねて表示する。
 // Slack のエディタ (Quill) の DOM に要素を差し込むと編集内容を壊しうるため、
 // body 直下の Shadow DOM に fixed 配置し、入力欄の矩形に合わせて位置だけ追従させる。
+import type { ElapsedLevel } from "@/lib/duration";
 
 const STYLE = `
 	.badge {
@@ -14,6 +15,14 @@ const STYLE = `
 		font: 11px/1.4 system-ui, sans-serif;
 		font-variant-numeric: tabular-nums;
 	}
+	.badge[data-level="warn"] {
+		background: #f5c518;
+		color: #1d1c1d;
+	}
+	.badge[data-level="over"] {
+		background: #e01e5a;
+		color: #fff;
+	}
 `;
 
 const RIGHT_INSET_PX = 8;
@@ -21,6 +30,7 @@ const RIGHT_INSET_PX = 8;
 export type BadgeItem = {
 	composer: HTMLElement;
 	text: string;
+	level: ElapsedLevel;
 };
 
 export function createBadgeLayer() {
@@ -36,7 +46,7 @@ export function createBadgeLayer() {
 	const render = (items: readonly BadgeItem[]) => {
 		const viewportWidth = document.documentElement.clientWidth;
 		const visible = new Set<HTMLElement>();
-		for (const { composer, text } of items) {
+		for (const { composer, text, level } of items) {
 			let badge = badges.get(composer);
 			if (!badge) {
 				badge = document.createElement("div");
@@ -46,6 +56,7 @@ export function createBadgeLayer() {
 			}
 			const rect = composer.getBoundingClientRect();
 			badge.textContent = text;
+			badge.dataset.level = level;
 			badge.style.top = `${rect.top + 4}px`;
 			badge.style.right = `${viewportWidth - rect.right + RIGHT_INSET_PX}px`;
 			visible.add(composer);
