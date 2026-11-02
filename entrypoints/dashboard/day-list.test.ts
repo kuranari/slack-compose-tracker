@@ -69,6 +69,8 @@ describe("toDayRows", () => {
 				pane: "thread",
 				channel: "C1",
 				excerpt: "長い 本文",
+				rewriteRatio: "0.00",
+				rewriteLevel: "normal",
 			},
 			{
 				startedAt: at(11, 0),
@@ -78,6 +80,8 @@ describe("toDayRows", () => {
 				pane: "channel",
 				channel: "C2",
 				excerpt: "hello",
+				rewriteRatio: "0.00",
+				rewriteLevel: "normal",
 			},
 		]);
 	});
@@ -85,7 +89,10 @@ describe("toDayRows", () => {
 	it("text の無い古い記録でも落ちない", () => {
 		const old = record();
 		delete (old as Partial<ComposeRecord>).text;
-		expect(toDayRows([old])[0]?.excerpt).toBe("");
+		expect(toDayRows([old])[0]).toMatchObject({
+			excerpt: "",
+			rewriteRatio: "-",
+		});
 	});
 });
 
@@ -102,6 +109,7 @@ describe("summarizeDay", () => {
 			totalMs: 6_000,
 			longestMs: 5_000,
 			discardedCount: 1,
+			medianRewriteRatio: 0,
 		});
 	});
 
@@ -111,6 +119,7 @@ describe("summarizeDay", () => {
 			totalMs: 0,
 			longestMs: 0,
 			discardedCount: 0,
+			medianRewriteRatio: Number.NaN,
 		});
 	});
 });

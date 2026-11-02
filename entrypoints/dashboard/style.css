@@ -164,6 +164,17 @@ button:hover {
 	text-align: right;
 }
 
+/* 書き直し率の目安 (rewrite.ts): 0.5 以上で黄、1.0 以上で赤 */
+.records td.rewrite.warn {
+	color: light-dark(#7a5c00, #f5c518);
+	font-weight: 600;
+}
+
+.records td.rewrite.over {
+	color: light-dark(#b0123f, #ff7a9c);
+	font-weight: 600;
+}
+
 .records td.excerpt {
 	/* 本文は残りの幅に収め、はみ出しは … で切る */
 	max-width: 0;

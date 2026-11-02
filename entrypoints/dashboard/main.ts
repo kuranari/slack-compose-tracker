@@ -19,6 +19,7 @@ import {
 	playStartIndex,
 	type ReplayStep,
 } from "./replay";
+import { formatRatio, rewriteStats } from "./rewrite";
 import { formatRoute, parseRoute, type Route, shiftDay } from "./route";
 
 // 1 ステップあたりの再生間隔。スナップショットは約 10 秒ごとなので実時間ではなく早送りで見せる
@@ -60,6 +61,7 @@ const renderDay = (day: string, records: ComposeRecord[]) => {
 	$("sum-total").textContent = formatDuration(summary.totalMs);
 	$("sum-longest").textContent = formatDuration(summary.longestMs);
 	$("sum-discarded").textContent = `${summary.discardedCount} 件`;
+	$("sum-rewrite").textContent = formatRatio(summary.medianRewriteRatio);
 	$("records-caption").textContent = `${day} の記録 (${records.length} 件)`;
 
 	const rows = toDayRows(records).map((row) => {
@@ -80,6 +82,7 @@ const renderDay = (day: string, records: ComposeRecord[]) => {
 		tr.append(
 			timeCell,
 			el("td", row.duration, "num"),
+			el("td", row.rewriteRatio, `num rewrite ${row.rewriteLevel}`),
 			outcomeCell,
 			el("td", PANE_LABEL[row.pane], "col-pane"),
 			el("td", row.channel, "col-channel channel"),
@@ -206,6 +209,18 @@ const renderStepList = () => {
 const withId = (name: string | undefined, id: string) =>
 	name ? `${name} (${id})` : id;
 
+// 履歴は約 10 秒ごとなので、削除の量はどれも「少なくとも」の値
+const rewriteEntries = (r: ComposeRecord): [string, string][] => {
+	const s = rewriteStats(r);
+	if (!s) return [];
+	return [
+		["書き直し率", formatRatio(s.ratio)],
+		["削除した文字数", `${s.deletedChars} 文字`],
+		["一続きで消した最大", `${s.largestDeletion} 文字`],
+		["前の文の修正", `${s.midEditSteps} 回`],
+	];
+};
+
 const renderMeta = (r: ComposeRecord) => {
 	const entries: [string, string][] = [
 		["開始", formatDateTime(r.startedAt)],
@@ -218,6 +233,7 @@ const renderMeta = (r: ComposeRecord) => {
 		...(r.threadTs ? [["スレッド", r.threadTs] as [string, string]] : []),
 		["入力回数", `${r.inputCount} 回`],
 		["文字数", `${r.length} 文字`],
+		...rewriteEntries(r),
 		["スナップショット", `${r.snapshots?.length ?? 0} 件`],
 	];
 	$("detail-meta").replaceChildren(

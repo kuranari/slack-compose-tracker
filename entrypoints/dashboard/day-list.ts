@@ -7,6 +7,13 @@ import {
 	summarize,
 } from "@/lib/compose-record";
 import { formatDuration } from "@/lib/duration";
+import {
+	formatRatio,
+	medianSentRatio,
+	type RewriteLevel,
+	rewriteLevel,
+	rewriteStats,
+} from "./rewrite";
 
 export type DayRow = {
 	// 詳細画面へのリンクに使う。同じ日の中で記録を特定するキー
@@ -18,6 +25,9 @@ export type DayRow = {
 	// 名前が無い記録 (初期版や取得失敗) は ID で代用する
 	channel: string;
 	excerpt: string;
+	// 書き直し率 ("1.46")。本文の無い古い記録は "-"
+	rewriteRatio: string;
+	rewriteLevel: RewriteLevel;
 };
 
 export type DaySummary = {
@@ -25,6 +35,8 @@ export type DaySummary = {
 	totalMs: number;
 	longestMs: number;
 	discardedCount: number;
+	// 送信した下書きの書き直し率の中央値。対象が無ければ NaN
+	medianRewriteRatio: number;
 };
 
 const EXCERPT_LENGTH = 80;
@@ -58,16 +70,21 @@ export function sortByStart(
 }
 
 export function toDayRows(records: readonly ComposeRecord[]): DayRow[] {
-	return sortByStart(records).map((r) => ({
-		startedAt: r.startedAt,
-		startTime: formatClock(r.startedAt),
-		duration: formatDuration(r.durationMs),
-		outcome: r.outcome,
-		pane: r.pane,
-		channel: channelLabel(r),
-		// 初期版の記録には text が無い
-		excerpt: excerpt(r.text ?? ""),
-	}));
+	return sortByStart(records).map((r) => {
+		const stats = rewriteStats(r);
+		return {
+			startedAt: r.startedAt,
+			startTime: formatClock(r.startedAt),
+			duration: formatDuration(r.durationMs),
+			outcome: r.outcome,
+			pane: r.pane,
+			channel: channelLabel(r),
+			// 初期版の記録には text が無い
+			excerpt: excerpt(r.text ?? ""),
+			rewriteRatio: formatRatio(stats?.ratio),
+			rewriteLevel: rewriteLevel(stats),
+		};
+	});
 }
 
 // 合計・最長は popup と同じく送信分だけで数える。破棄は件数だけ別に出す
@@ -78,6 +95,7 @@ export function summarizeDay(records: readonly ComposeRecord[]): DaySummary {
 		totalMs: sent.totalMs,
 		longestMs: sent.longestMs,
 		discardedCount: records.filter((r) => r.outcome === "discarded").length,
+		medianRewriteRatio: medianSentRatio(records),
 	};
 }
 
