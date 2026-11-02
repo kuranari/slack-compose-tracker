@@ -6,7 +6,11 @@ import {
 	type Pane,
 	summarize,
 } from "@/lib/compose-record";
-import { formatDuration } from "@/lib/duration";
+import {
+	type ElapsedLevel,
+	elapsedLevel,
+	formatDuration,
+} from "@/lib/duration";
 import {
 	formatRatio,
 	medianSentRatio,
@@ -20,6 +24,8 @@ export type DayRow = {
 	startedAt: number;
 	startTime: string;
 	duration: string;
+	// 入力欄のバッジと同じ目安 (5 分で黄、10 分で赤)
+	durationLevel: ElapsedLevel;
 	outcome: ComposeOutcome;
 	pane: Pane;
 	// 名前が無い記録 (初期版や取得失敗) は ID で代用する
@@ -76,6 +82,7 @@ export function toDayRows(records: readonly ComposeRecord[]): DayRow[] {
 			startedAt: r.startedAt,
 			startTime: formatClock(r.startedAt),
 			duration: formatDuration(r.durationMs),
+			durationLevel: elapsedLevel(r.durationMs),
 			outcome: r.outcome,
 			pane: r.pane,
 			channel: channelLabel(r),

@@ -81,7 +81,7 @@ const renderDay = (day: string, records: ComposeRecord[]) => {
 
 		tr.append(
 			timeCell,
-			el("td", row.duration, "num"),
+			el("td", row.duration, `num ${row.durationLevel}`),
 			el("td", row.rewriteRatio, `num rewrite ${row.rewriteLevel}`),
 			outcomeCell,
 			el("td", PANE_LABEL[row.pane], "col-pane"),
