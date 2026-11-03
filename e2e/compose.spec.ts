@@ -308,6 +308,86 @@ test.describe("AI の提案", () => {
 	});
 });
 
+test.describe("AI の提案 (API を差し替え)", () => {
+	test.beforeEach(async ({ serviceWorker }) => {
+		await serviceWorker.evaluate(async () => {
+			const { chrome } = globalThis as unknown as {
+				chrome: { storage: { local: { set(items: object): Promise<void> } } };
+			};
+			await chrome.storage.local.set({
+				"suggest-settings": { enabled: true, apiKey: "e2e-dummy-key" },
+			});
+		});
+	});
+
+	test("一度聞いた提案は出し直すだけで、もう一度聞くときだけ API を呼ぶ", async ({
+		page,
+		extensionContext,
+	}) => {
+		let calls = 0;
+		// background (Service Worker) から Claude API への通信を差し替える
+		await extensionContext.route("https://api.anthropic.com/**", (route) => {
+			calls++;
+			return route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({
+					id: `msg_e2e_${calls}`,
+					type: "message",
+					role: "assistant",
+					model: "claude-opus-5-5",
+					content: [
+						{
+							type: "text",
+							text: JSON.stringify({
+								draft: `**文案${calls}**`,
+								points: ["結論を先に"],
+							}),
+						},
+					],
+					stop_reason: "end_turn",
+					stop_sequence: null,
+					usage: { input_tokens: 1, output_tokens: 1 },
+				}),
+			});
+		});
+		const composer = channelComposer(page);
+		await composer.pressSequentially(uniqueText("suggest-cache"));
+		const ai = overlayButton(page, "ai");
+		const panel = page.locator(".panel");
+
+		await ai.click();
+		await expect(panel).toContainText("**文案1**");
+		expect(calls).toBe(1);
+
+		// 閉じて開き直しても API は呼ばない
+		await ai.click();
+		await expect(panel).toBeHidden();
+		await ai.click();
+		await expect(panel).toContainText("**文案1**");
+		expect(calls).toBe(1);
+
+		// 下書きを変えたら、そのことを添えて前の提案を出す
+		await ai.click();
+		await composer.press("End");
+		await composer.pressSequentially(" 追記");
+		await ai.click();
+		await expect(panel.locator(".panel-note")).toContainText(
+			"下書きが変わっています",
+		);
+		expect(calls).toBe(1);
+
+		await panel.locator("button.retry").click();
+		await expect(panel).toContainText("**文案2**");
+		await expect(panel.locator(".panel-note")).toBeHidden();
+		expect(calls).toBe(2);
+
+		await extensionContext.unrouteAll();
+		await clearComposer(composer);
+		await expect(panel).toBeHidden();
+	});
+});
+
 test.describe("定型文", () => {
 	const template = {
 		id: "e2e-template",

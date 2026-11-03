@@ -167,7 +167,10 @@ export type OverlayItem = {
 export type PanelState = "loading" | "done" | "error";
 
 export type OverlayHandlers = {
+	// AI のボタン。前の提案があれば出し直すだけで、API は呼ばない
 	onAsk: (composer: HTMLElement) => void;
+	// パネルの「もう一度聞く」。こちらは必ず API を呼ぶ
+	onRetry: (composer: HTMLElement) => void;
 	onPickTemplate: (
 		composer: HTMLElement,
 		template: Template,
@@ -225,13 +228,19 @@ export function createComposerOverlay(handlers: OverlayHandlers) {
 	const copyButton = document.createElement("button");
 	copyButton.type = "button";
 	copyButton.textContent = "コピー";
+	const retryButton = document.createElement("button");
+	retryButton.type = "button";
+	retryButton.className = "retry";
+	retryButton.textContent = "もう一度聞く";
 	const closeButton = document.createElement("button");
 	closeButton.type = "button";
 	closeButton.textContent = "閉じる";
+	const panelNote = document.createElement("p");
+	panelNote.className = "panel-note";
 	const actions = document.createElement("div");
 	actions.className = "panel-actions";
-	actions.append(copyButton, closeButton);
-	panel.append(panelBody, actions);
+	actions.append(retryButton, copyButton, closeButton);
+	panel.append(panelNote, panelBody, actions);
 
 	// 定型文の一覧
 	const picker = document.createElement("div");
@@ -257,6 +266,9 @@ export function createComposerOverlay(handlers: OverlayHandlers) {
 		panelComposer = null;
 	};
 	closeButton.addEventListener("click", hidePanel);
+	retryButton.addEventListener("click", () => {
+		if (panelComposer) handlers.onRetry(panelComposer);
+	});
 	copyButton.addEventListener("click", () => {
 		void navigator.clipboard.writeText(copyText);
 		copyButton.textContent = "コピーしました";
@@ -266,15 +278,22 @@ export function createComposerOverlay(handlers: OverlayHandlers) {
 		composer: HTMLElement,
 		state: PanelState,
 		text: string,
-		// コピーボタンで写す文。省略すると表示している文をそのまま写す
-		copy?: string,
+		options: {
+			// コピーボタンで写す文。省略すると表示している文をそのまま写す
+			copy?: string;
+			// 本文の上に添える注意書き (前の提案を出し直したときなど)
+			note?: string;
+		} = {},
 	) => {
 		hidePicker();
 		panelComposer = composer;
 		panel.dataset.state = state;
 		panelBody.textContent = text;
-		copyText = copy ?? text;
+		panelNote.textContent = options.note ?? "";
+		panelNote.hidden = !options.note;
+		copyText = options.copy ?? text;
 		copyButton.hidden = state !== "done";
+		retryButton.hidden = state === "loading";
 		copyButton.textContent = "コピー";
 		panel.hidden = false;
 	};
@@ -381,7 +400,10 @@ export function createComposerOverlay(handlers: OverlayHandlers) {
 		badge.className = "badge";
 		const ai = iconButton("ai", "AI に聞く", AI_ICON);
 		const template = iconButton("template", "定型文", TEMPLATE_ICON);
-		ai.addEventListener("click", () => handlers.onAsk(composer));
+		// 開いているパネルをもう一度押したら閉じる
+		ai.addEventListener("click", () =>
+			panelComposer === composer ? hidePanel() : handlers.onAsk(composer),
+		);
 		template.addEventListener("click", () =>
 			pickerComposer === composer ? hidePicker() : showPicker(composer),
 		);

@@ -36,7 +36,11 @@ import {
 	threadRootChannelId,
 	threadRootTs,
 } from "@/lib/slack-dom";
-import { type SuggestResult, suggestionView } from "@/lib/suggest-prompt";
+import {
+	type SuggestOk,
+	type SuggestResult,
+	suggestionView,
+} from "@/lib/suggest-prompt";
 import {
 	getSuggestSettings,
 	isSuggestReady,
@@ -74,32 +78,76 @@ export default defineContentScript({
 				suggestReady = isSuggestReady(s);
 			}),
 		);
-		const asking = new WeakSet<HTMLElement>();
-		const askSuggestion = (composer: HTMLElement) => {
+		// 提案は下書きごとに覚えておき、AI のボタンでは出し直すだけにする。API を呼ぶのは、
+		// 初めて聞くときと「もう一度聞く」を押したときだけ。下書きが終わったら忘れる
+		type Suggestion =
+			| { state: "loading"; draft: string }
+			| { state: "done"; draft: string; result: SuggestOk };
+		const suggestions = new Map<string, Suggestion>();
+
+		const showSuggestion = (composer: HTMLElement, s: Suggestion) => {
+			if (s.state === "loading") {
+				badges.showPanel(composer, "loading", "考えています…");
+				return;
+			}
+			const changed = s.draft !== composerText(composer);
+			badges.showPanel(composer, "done", suggestionView(s.result), {
+				copy: s.result.draft,
+				...(changed && {
+					note: "この提案のあとに下書きが変わっています。今の下書きで聞くなら「もう一度聞く」を押してください",
+				}),
+			});
+		};
+
+		const requestSuggestion = (composer: HTMLElement, key: string) => {
 			const draft = composerText(composer);
-			if (!draft || asking.has(composer)) return;
-			asking.add(composer);
-			badges.showPanel(composer, "loading", "考えています…");
+			if (!draft) return;
+			const previous = suggestions.get(key);
+			const pending: Suggestion = { state: "loading", draft };
+			suggestions.set(key, pending);
+			showSuggestion(composer, pending);
+			// 失敗したら前の提案に戻す (エラーは覚えない。次に押せばまた聞く)
+			const restore = () => {
+				if (suggestions.get(key) !== pending) return;
+				if (previous?.state === "done") suggestions.set(key, previous);
+				else suggestions.delete(key);
+			};
 			browser.runtime
 				.sendMessage(suggestMessage(draft))
 				.then((result: SuggestResult) => {
+					if (result.ok) {
+						if (suggestions.get(key) === pending) {
+							suggestions.set(key, { state: "done", draft, result });
+						}
+					} else restore();
 					if (!badges.isPanelFor(composer)) return;
 					if (result.ok) {
-						badges.showPanel(
-							composer,
-							"done",
-							suggestionView(result),
-							result.draft,
-						);
+						showSuggestion(composer, { state: "done", draft, result });
 					} else badges.showPanel(composer, "error", result.error);
 				})
 				.catch((err: unknown) => {
+					restore();
 					if (badges.isPanelFor(composer)) {
 						badges.showPanel(composer, "error", String(err));
 					}
-				})
-				.finally(() => asking.delete(composer));
+				});
 		};
+
+		const askSuggestion = (composer: HTMLElement) => {
+			const key = keyOf(composer);
+			if (!key) return;
+			const cached = suggestions.get(key);
+			if (cached) showSuggestion(composer, cached);
+			else requestSuggestion(composer, key);
+		};
+
+		const retrySuggestion = (composer: HTMLElement) => {
+			const key = keyOf(composer);
+			if (key && suggestions.get(key)?.state !== "loading") {
+				requestSuggestion(composer, key);
+			}
+		};
+
 		// 定型文は Slack の貼り付けの処理で入れる (lib/composer-insert.ts)。貼り付けは
 		// input イベントを出さないので、下の paste の処理で下書きを始め、そこで使った定型文も残す
 		const pendingTemplates = new WeakMap<HTMLElement, string>();
@@ -116,6 +164,7 @@ export default defineContentScript({
 
 		const badges = createComposerOverlay({
 			onAsk: askSuggestion,
+			onRetry: retrySuggestion,
 			onPickTemplate: insertTemplate,
 			onOpenOptions: () => {
 				void browser.runtime.sendMessage(openOptionsMessage());
@@ -344,6 +393,7 @@ export default defineContentScript({
 				}
 				items.push({ composer, elapsed: null, canAsk: false });
 				sessions.delete(key);
+				suggestions.delete(key);
 				const record = closeSession(session, c, now, pendingSends.get(key));
 				if (shouldSave(record)) save(record);
 				pendingSends.delete(key);

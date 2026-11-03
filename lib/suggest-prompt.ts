@@ -35,9 +35,8 @@ export function suggestUserContent(draft: string): string {
 	return `書きかけのメッセージ:\n<draft>\n${draft}\n</draft>`;
 }
 
-export type SuggestResult =
-	| { ok: true; draft: string; points: string[] }
-	| { ok: false; error: string };
+export type SuggestOk = { ok: true; draft: string; points: string[] };
+export type SuggestResult = SuggestOk | { ok: false; error: string };
 
 export function resultOf(message: Anthropic.Beta.BetaMessage): SuggestResult {
 	if (message.stop_reason === "refusal") {
