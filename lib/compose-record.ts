@@ -24,8 +24,11 @@ export type ComposeRecord = {
 	inputCount: number;
 	length: number;
 	outcome: ComposeOutcome;
-	// 送信または破棄の直前に入力欄にあった全文
+	// 送信または破棄の直前に入力欄にあった全文。length もこの文字数 (記号を含む)
 	text: string;
+	// "markdown" なら text と履歴は太字やリストを Markdown の記法で残している。
+	// 無ければ 2026-11-03 より前の記録で、書式の落ちた文字だけ
+	textFormat?: "markdown";
 	// IME で確定した文字だけの履歴 (分析・再生の既定)
 	snapshots: Snapshot[];
 	// 変換中の未確定文字も含む履歴。確定だけの履歴と比べるために並行して残す。

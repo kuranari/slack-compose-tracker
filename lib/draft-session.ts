@@ -130,6 +130,7 @@ export function closeSession(
 		length: session.text.length,
 		outcome: sent ? "sent" : "discarded",
 		text: session.text,
+		textFormat: "markdown",
 		// 最終形も履歴の末尾に入れて、間隔の途中で終わった分を取りこぼさない
 		snapshots: appendSnapshot(session.snapshots, durationMs, session.text),
 		rawSnapshots: appendSnapshot(

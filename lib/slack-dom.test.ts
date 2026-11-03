@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { emojiText } from "@/lib/emoji-text";
 import {
-	emojiText,
 	parseLocation,
 	teamNameFromTitle,
 	threadChannelIdFromPath,

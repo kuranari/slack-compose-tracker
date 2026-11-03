@@ -3,6 +3,7 @@ import { isSaveRecordMessage, isSuggestMessage } from "@/lib/messages";
 import { appendRecord } from "@/lib/record-store";
 import {
 	resultOf,
+	SUGGEST_FORMAT,
 	SUGGEST_MODEL,
 	SUGGEST_SYSTEM,
 	type SuggestResult,
@@ -37,7 +38,7 @@ async function suggest(draft: string): Promise<SuggestResult> {
 		const message = await client.beta.messages.create({
 			model: SUGGEST_MODEL,
 			max_tokens: 16000,
-			output_config: { effort: "low" },
+			output_config: { effort: "low", format: SUGGEST_FORMAT },
 			// 安全性の判定で断られたら、サーバー側で別のモデルにやり直させる
 			betas: ["server-side-fallback-2026-07-01"],
 			fallbacks: "default",

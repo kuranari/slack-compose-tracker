@@ -148,6 +148,32 @@ test("スレッドで送信ボタンを押すと threadTs 付きで記録され�
 	});
 });
 
+test("太字やリストは Markdown の記法で本文に残る", async ({
+	page,
+	serviceWorker,
+}) => {
+	const composer = channelComposer(page);
+	await composer.click();
+	await page.keyboard.type("普通 ");
+	await page.keyboard.press("ControlOrMeta+b");
+	await page.keyboard.type("太字");
+	await page.keyboard.press("ControlOrMeta+b");
+	await page.keyboard.press("Enter");
+	await page.keyboard.type("- 箇条1");
+	await page.keyboard.press("Enter");
+	await page.keyboard.type("箇条2");
+	await waitElapsed(page, MIN_DISCARD_MS);
+	await clearComposer(composer);
+
+	await expect.poll(() => readRecords(serviceWorker)).toHaveLength(1);
+	const [record] = await readRecords(serviceWorker);
+	expect(record).toMatchObject({
+		outcome: "discarded",
+		text: "普通 **太字**\n- 箇条1\n- 箇条2",
+		textFormat: "markdown",
+	});
+});
+
 test("絵文字は :name: の表記で本文に残る", async ({ page, serviceWorker }) => {
 	const text = uniqueText("emoji");
 	const composer = channelComposer(page);

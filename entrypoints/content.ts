@@ -27,7 +27,7 @@ import {
 	threadRootChannelId,
 	threadRootTs,
 } from "@/lib/slack-dom";
-import type { SuggestResult } from "@/lib/suggest-prompt";
+import { type SuggestResult, suggestionView } from "@/lib/suggest-prompt";
 import {
 	getSuggestSettings,
 	isSuggestReady,
@@ -73,8 +73,14 @@ export default defineContentScript({
 				.sendMessage(suggestMessage(draft))
 				.then((result: SuggestResult) => {
 					if (!badges.isPanelFor(composer)) return;
-					if (result.ok) badges.showPanel(composer, "done", result.text);
-					else badges.showPanel(composer, "error", result.error);
+					if (result.ok) {
+						badges.showPanel(
+							composer,
+							"done",
+							suggestionView(result),
+							result.draft,
+						);
+					} else badges.showPanel(composer, "error", result.error);
 				})
 				.catch((err: unknown) => {
 					if (badges.isPanelFor(composer)) {

@@ -162,6 +162,7 @@ describe("closeSession", () => {
 			length: 4,
 			outcome: "sent",
 			text: "abcd",
+			textFormat: "markdown",
 			snapshots: [
 				{ at: 0, text: "a" },
 				{ at: 5_000, text: "abcd" },

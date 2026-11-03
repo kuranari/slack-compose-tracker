@@ -136,6 +136,7 @@ export function createBadgeLayer(
 	root.append(panel);
 
 	let panelComposer: HTMLElement | null = null;
+	let copyText = "";
 
 	const hidePanel = () => {
 		panel.hidden = true;
@@ -143,7 +144,7 @@ export function createBadgeLayer(
 	};
 	closeButton.addEventListener("click", hidePanel);
 	copyButton.addEventListener("click", () => {
-		void navigator.clipboard.writeText(panelBody.textContent ?? "");
+		void navigator.clipboard.writeText(copyText);
 		copyButton.textContent = "コピーしました";
 	});
 
@@ -151,10 +152,13 @@ export function createBadgeLayer(
 		composer: HTMLElement,
 		state: PanelState,
 		text: string,
+		// コピーボタンで写す文。省略すると表示している文をそのまま写す
+		copy?: string,
 	) => {
 		panelComposer = composer;
 		panel.dataset.state = state;
 		panelBody.textContent = text;
+		copyText = copy ?? text;
 		copyButton.hidden = state !== "done";
 		copyButton.textContent = "コピー";
 		panel.hidden = false;
