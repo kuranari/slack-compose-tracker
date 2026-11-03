@@ -1,3 +1,4 @@
+import { rmSync } from "node:fs";
 import path from "node:path";
 import {
 	type BrowserContext,
@@ -30,6 +31,13 @@ type WorkerFixtures = {
 export const test = base.extend<{ page: Page }, WorkerFixtures>({
 	extensionContext: [
 		async ({ headless }, use) => {
+			// Chrome はプロファイルに Service Worker のスクリプトをキャッシュし、拡張を読み込み直しても
+			// 古い background のまま動くことがある (2026-11-03 に確認)。毎回消して、ビルドしたものを使わせる。
+			// ログイン状態は Cookie にあるので、ここを消しても失われない
+			rmSync(path.join(PROFILE_DIR, "Default", "Service Worker"), {
+				recursive: true,
+				force: true,
+			});
 			const context = await chromium.launchPersistentContext(PROFILE_DIR, {
 				channel: "chromium",
 				headless,
