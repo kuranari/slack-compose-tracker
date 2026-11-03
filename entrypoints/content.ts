@@ -1,4 +1,9 @@
 import type { ComposeRecord } from "@/lib/compose-record";
+import { composerRange, insertIntoComposer } from "@/lib/composer-insert";
+import {
+	createComposerOverlay,
+	type OverlayItem,
+} from "@/lib/composer-overlay";
 import {
 	closeSession,
 	type DraftContext,
@@ -8,10 +13,14 @@ import {
 	recordInput,
 	SEND_WINDOW_MS,
 	shouldSave,
+	useTemplate,
 } from "@/lib/draft-session";
 import { elapsedLevel, formatDuration } from "@/lib/duration";
-import { createBadgeLayer } from "@/lib/elapsed-badge";
-import { saveRecordMessage, suggestMessage } from "@/lib/messages";
+import {
+	openOptionsMessage,
+	saveRecordMessage,
+	suggestMessage,
+} from "@/lib/messages";
 import {
 	closestComposer,
 	composerChannelId,
@@ -33,6 +42,8 @@ import {
 	isSuggestReady,
 	watchSuggestSettings,
 } from "@/lib/suggest-settings";
+import { getTemplates, watchTemplates } from "@/lib/template-store";
+import type { Template } from "@/lib/templates";
 
 // オブジェクトのままだと DevTools 外 (CDP 経由のログ取得) で "Object" に潰れるため文字列化する
 const format = (args: unknown[]) =>
@@ -52,7 +63,7 @@ export default defineContentScript({
 
 		const sessions = new Map<string, DraftSession>();
 		const pendingSends = new Map<string, number>();
-		// バッジを押すと、AI に本文を見てもらう (docs/ai-suggest-design.md)。
+		// AI のボタンを押すと、AI に本文を見てもらう (docs/ai-suggest-design.md)。
 		// 本文を外部に送るので、オプション画面で有効にした端末でだけ押せるようにする
 		let suggestReady = false;
 		void getSuggestSettings().then((s) => {
@@ -89,8 +100,31 @@ export default defineContentScript({
 				})
 				.finally(() => asking.delete(composer));
 		};
-		const badges = createBadgeLayer(askSuggestion);
+		// 定型文は Slack の貼り付けの処理で入れる (lib/composer-insert.ts)。貼り付けは
+		// input イベントを出さないので、下の paste の処理で下書きを始め、そこで使った定型文も残す
+		const pendingTemplates = new WeakMap<HTMLElement, string>();
+		const insertTemplate = (
+			composer: HTMLElement,
+			template: Template,
+			range: Range | null,
+		) => {
+			// 変換中に貼ると未確定の文字と混ざるので入れない
+			if (composing.has(composer)) return;
+			pendingTemplates.set(composer, template.id);
+			insertIntoComposer(composer, template.body, range);
+		};
+
+		const badges = createComposerOverlay({
+			onAsk: askSuggestion,
+			onPickTemplate: insertTemplate,
+			onOpenOptions: () => {
+				void browser.runtime.sendMessage(openOptionsMessage());
+			},
+			rangeOf: composerRange,
+		});
 		ctx.onInvalidated(badges.destroy);
+		void getTemplates().then(badges.setTemplates);
+		ctx.onInvalidated(watchTemplates(badges.setTemplates));
 
 		// URL がチャンネルを指していない画面 (Threads 一覧など) や、親メッセージが
 		// 特定できないスレッドは、下書きを一意に識別できないので追跡しない
@@ -191,6 +225,31 @@ export default defineContentScript({
 				.catch((err: unknown) => warn("save failed", String(err)));
 		};
 
+		const onComposerInput = (composer: HTMLElement) => {
+			const c = contextOf(composer);
+			if (!c) return;
+			const text = composerText(composer);
+			if (!text) return;
+			const key = draftKey(c);
+			// 送信なら Slack は input を出さずに入力欄を空にする。送信操作の後に文字が残る入力が
+			// 来たなら、その Enter は補完 (チャンネル・メンション・絵文字) の確定や改行だった
+			pendingSends.delete(key);
+			const prev = sessions.get(key);
+			let session = recordInput(
+				prev,
+				Date.now(),
+				text,
+				composing.has(composer),
+			);
+			const templateId = pendingTemplates.get(composer);
+			if (templateId) {
+				session = useTemplate(session, templateId);
+				pendingTemplates.delete(composer);
+			}
+			sessions.set(key, session);
+			if (!prev) log("start", c);
+		};
+
 		ctx.addEventListener(
 			document,
 			"input",
@@ -238,23 +297,6 @@ export default defineContentScript({
 			{ capture: true },
 		);
 
-		const onComposerInput = (composer: HTMLElement) => {
-			const c = contextOf(composer);
-			if (!c) return;
-			const text = composerText(composer);
-			if (!text) return;
-			const key = draftKey(c);
-			// 送信なら Slack は input を出さずに入力欄を空にする。送信操作の後に文字が残る入力が
-			// 来たなら、その Enter は補完 (チャンネル・メンション・絵文字) の確定や改行だった
-			pendingSends.delete(key);
-			const prev = sessions.get(key);
-			sessions.set(
-				key,
-				recordInput(prev, Date.now(), text, composing.has(composer)),
-			);
-			if (!prev) log("start", c);
-		};
-
 		ctx.addEventListener(
 			document,
 			"click",
@@ -272,12 +314,17 @@ export default defineContentScript({
 		// 定期的に入力欄を見て「空になった下書き」を締め、表示も更新する
 		ctx.setInterval(() => {
 			const now = Date.now();
-			const items = [];
+			const items: OverlayItem[] = [];
 			for (const composer of findComposers()) {
 				const c = contextOf(composer);
-				const key = c && draftKey(c);
-				const session = key && sessions.get(key);
-				if (!c || !key || !session) continue;
+				if (!c) continue;
+				const key = draftKey(c);
+				const session = sessions.get(key);
+				// 定型文のボタンは空の入力欄にも出す
+				if (!session) {
+					items.push({ composer, elapsed: null, canAsk: false });
+					continue;
+				}
 				const text = composerText(composer);
 				if (text) {
 					sessions.set(
@@ -285,15 +332,17 @@ export default defineContentScript({
 						observeText(session, now, text, composing.has(composer)),
 					);
 					const elapsed = now - session.startedAt;
-					const level = elapsedLevel(elapsed);
 					items.push({
 						composer,
-						text: formatDuration(elapsed),
-						level,
-						clickable: suggestReady,
+						elapsed: {
+							text: formatDuration(elapsed),
+							level: elapsedLevel(elapsed),
+						},
+						canAsk: suggestReady,
 					});
 					continue;
 				}
+				items.push({ composer, elapsed: null, canAsk: false });
 				sessions.delete(key);
 				const record = closeSession(session, c, now, pendingSends.get(key));
 				if (shouldSave(record)) save(record);

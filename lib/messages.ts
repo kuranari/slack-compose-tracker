@@ -38,3 +38,20 @@ export function isSuggestMessage(message: unknown): message is SuggestMessage {
 		typeof (message as { draft?: unknown }).draft === "string"
 	);
 }
+
+// 定型文がまだ無いとき、一覧からオプション画面を開く (content script からは開けない)
+export type OpenOptionsMessage = { type: "open-options" };
+
+export function openOptionsMessage(): OpenOptionsMessage {
+	return { type: "open-options" };
+}
+
+export function isOpenOptionsMessage(
+	message: unknown,
+): message is OpenOptionsMessage {
+	return (
+		typeof message === "object" &&
+		message !== null &&
+		(message as { type?: unknown }).type === "open-options"
+	);
+}

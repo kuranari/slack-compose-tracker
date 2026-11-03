@@ -9,6 +9,7 @@ import {
 	SEND_WINDOW_MS,
 	SNAPSHOT_INTERVAL_MS,
 	shouldSave,
+	useTemplate,
 } from "@/lib/draft-session";
 
 const channel: DraftContext = {
@@ -228,5 +229,25 @@ describe("shouldSave", () => {
 	it("送信はすぐでも残す", () => {
 		const record = closeSession(session, thread, 1_600, 1_500);
 		expect(shouldSave(record)).toBe(true);
+	});
+});
+
+describe("useTemplate", () => {
+	const session = recordInput(undefined, 0, "a");
+
+	it("入れた定型文の ID を順に残し、重複させない", () => {
+		const used = useTemplate(useTemplate(useTemplate(session, "x"), "y"), "x");
+		expect(used.templateIds).toEqual(["x", "y"]);
+	});
+
+	it("記録にも引き継ぐ", () => {
+		const ctx = { teamId: "T", channelId: "C", pane: "channel" } as const;
+		expect(
+			closeSession(useTemplate(session, "x"), ctx, 1_000, undefined)
+				.templateIds,
+		).toEqual(["x"]);
+		expect(closeSession(session, ctx, 1_000, undefined)).not.toHaveProperty(
+			"templateIds",
+		);
 	});
 });

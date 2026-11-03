@@ -79,6 +79,40 @@ export function findComposers(root: ParentNode = document): HTMLElement[] {
 	).filter((el) => el.getBoundingClientRect().width > 0);
 }
 
+// 入力欄の下の列 (添付・絵文字・@ と送信ボタンが並ぶ所)。書式ツールバーと違い、
+// 「Aa」で書式を隠しても消えないので、自前のボタンはここに合わせて置く (docs/composer-ui-design.md)
+export type ComposerFooter = {
+	// Slack のボタンの右端 (画面上の x 座標)。自前のボタンはこれより右に置く
+	buttonsRight: number;
+	// 送信ボタンのある右端。自前のボタンはこの左に置く
+	suffix: Element;
+	// 色を合わせるための Slack のアイコンボタン
+	iconButton: Element | null;
+};
+
+export function composerFooter(composer: HTMLElement): ComposerFooter | null {
+	const container = composer.closest(".c-wysiwyg_container");
+	const suffix = container?.querySelector(
+		'[data-qa="wysiwyg-container_suffix"]',
+	);
+	if (!container || !suffix) return null;
+	// ボタンの入れ物は送信ボタンの手前まで伸びているので、並んでいるボタンそのものの右端を取る
+	const buttons = container.querySelectorAll(
+		'[data-qa="wysiwyg-container_toolbar-buttons"] button',
+	);
+	const buttonsRight = Math.max(
+		0,
+		...Array.from(buttons, (b) => b.getBoundingClientRect())
+			.filter((r) => r.width > 0)
+			.map((r) => r.right),
+	);
+	return {
+		buttonsRight,
+		suffix,
+		iconButton: container.querySelector('[data-qa="texty_mention_button"]'),
+	};
+}
+
 export function closestComposer(
 	target: EventTarget | null,
 ): HTMLElement | null {

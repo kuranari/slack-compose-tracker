@@ -29,6 +29,8 @@ export type ComposeRecord = {
 	// "markdown" なら text と履歴は太字やリストを Markdown の記法で残している。
 	// 無ければ 2026-11-03 より前の記録で、書式の落ちた文字だけ
 	textFormat?: "markdown";
+	// 定型文を入れた下書きなら、その ID。分析で定型文を使った記録を分けるため
+	templateIds?: string[];
 	// IME で確定した文字だけの履歴 (分析・再生の既定)
 	snapshots: Snapshot[];
 	// 変換中の未確定文字も含む履歴。確定だけの履歴と比べるために並行して残す。

@@ -4,7 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Slack Compose Tracker の設定</title>
-    <meta name="manifest.open_in_tab" content="false" />
+    <!-- 定型文の編集に場所が要るので、タブで開く -->
+    <meta name="manifest.open_in_tab" content="true" />
     <style>
       :root {
         color-scheme: light dark;
@@ -14,7 +15,7 @@
       }
       main {
         padding: 12px 16px;
-        max-width: 480px;
+        max-width: 640px;
       }
       h1 {
         margin: 0 0 8px;
@@ -29,6 +30,26 @@
         width: 100%;
         font: inherit;
       }
+      h2 {
+        margin: 24px 0 8px;
+        font-size: 15px;
+      }
+      .template {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 4px 8px;
+        margin: 0 0 12px;
+      }
+      .template input,
+      .template textarea {
+        box-sizing: border-box;
+        width: 100%;
+        font: inherit;
+      }
+      .template textarea {
+        grid-column: 1;
+        min-height: 4.5em;
+      }
       .note {
         opacity: 0.7;
         font-size: 12px;
@@ -39,8 +60,8 @@
     <main>
       <h1>AI の提案</h1>
       <p class="note">
-        入力欄のバッジを押すと、Claude に直し方を提案させます。書き始めて 5
-        分を超えると、バッジが目立って押すよう促します。押したときだけ、その下書きの本文を
+        入力欄の下の AI のボタンを押すと、Claude に直し方を提案させます。書き始めて
+        5 分を超えると、ボタンが目立って押すよう促します。押したときだけ、その下書きの本文を
         Anthropic の API に送ります。
       </p>
       <form id="form">
@@ -54,6 +75,20 @@
         </label>
         <button type="submit">保存</button>
         <span id="status" class="note"></span>
+      </form>
+
+      <h2>定型文</h2>
+      <p class="note">
+        入力欄の下の定型文のボタンから選ぶと、カーソルの位置に入ります。本文は Markdown
+        で書けます（**太字**、- 箇条書き など）。この端末にだけ保存します。
+      </p>
+      <form id="templates-form">
+        <div id="templates"></div>
+        <p>
+          <button type="button" id="add-template">定型文を追加</button>
+          <button type="submit">保存</button>
+          <span id="templates-status" class="note"></span>
+        </p>
       </form>
     </main>
     <script type="module" src="./main.ts"></script>

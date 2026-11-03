@@ -1,5 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { isSaveRecordMessage, isSuggestMessage } from "@/lib/messages";
+import {
+	isOpenOptionsMessage,
+	isSaveRecordMessage,
+	isSuggestMessage,
+} from "@/lib/messages";
 import { appendRecord } from "@/lib/record-store";
 import {
 	resultOf,
@@ -57,6 +61,10 @@ export default defineBackground(() => {
 			appendRecord(message.record).catch((err: unknown) =>
 				console.error("[slack-compose-tracker] save failed", err),
 			);
+			return;
+		}
+		if (isOpenOptionsMessage(message)) {
+			void browser.runtime.openOptionsPage();
 			return;
 		}
 		if (isSuggestMessage(message)) {

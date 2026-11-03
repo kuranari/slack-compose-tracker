@@ -26,6 +26,8 @@ export type DraftSession = {
 	text: string;
 	snapshots: Snapshot[];
 	rawSnapshots: Snapshot[];
+	// この下書きに入れた定型文の ID (入れた順、重複なし)
+	templateIds?: string[];
 };
 
 export function draftKey(ctx: DraftContext): string {
@@ -63,6 +65,16 @@ export function recordInput(
 		inputCount: session.inputCount + 1,
 		text,
 	};
+}
+
+export function useTemplate(
+	session: DraftSession,
+	templateId: string,
+): DraftSession {
+	const ids = session.templateIds ?? [];
+	return ids.includes(templateId)
+		? session
+		: { ...session, templateIds: [...ids, templateId] };
 }
 
 const appendSnapshot = (
@@ -131,6 +143,7 @@ export function closeSession(
 		outcome: sent ? "sent" : "discarded",
 		text: session.text,
 		textFormat: "markdown",
+		...(session.templateIds && { templateIds: session.templateIds }),
 		// 最終形も履歴の末尾に入れて、間隔の途中で終わった分を取りこぼさない
 		snapshots: appendSnapshot(session.snapshots, durationMs, session.text),
 		rawSnapshots: appendSnapshot(

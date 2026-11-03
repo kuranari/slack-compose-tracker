@@ -29,9 +29,15 @@ export function threadSendButton(page: Page): Locator {
 	return threadPane(page).locator(SELECTORS.sendButton);
 }
 
-// Shadow DOM (open) 内のバッジ。Playwright の CSS ロケータは open な shadow root を貫通する
+// Shadow DOM (open) 内の経過時間。Playwright の CSS ロケータは open な shadow root を貫通する。
+// 入力欄ごとのボタンの列は常にあり、経過時間は下書きがあるときだけ見える
 export function badges(page: Page): Locator {
-	return page.locator(".badge");
+	return page.locator(".badge:not([hidden])");
+}
+
+// 入力欄の下の列に重ねた、自前のボタン
+export function overlayButton(page: Page, name: "ai" | "template"): Locator {
+	return page.locator(`.bar button.${name}`).filter({ visible: true }).first();
 }
 
 export async function clearComposer(composer: Locator): Promise<void> {

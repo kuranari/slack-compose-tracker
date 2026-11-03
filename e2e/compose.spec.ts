@@ -8,6 +8,7 @@ import {
 	closeThreadPane,
 	imeCompose,
 	openThreadOf,
+	overlayButton,
 	recordEnterKeydowns,
 	threadComposer,
 	threadParentTs,
@@ -284,25 +285,92 @@ test.describe("AI の提案", () => {
 		});
 	});
 
-	test("有効にするとバッジが押せるようになり、押すとパネルに結果が出る", async ({
+	test("有効にすると AI のボタンが出て、押すとパネルに結果が出る", async ({
 		page,
 	}) => {
 		const composer = channelComposer(page);
+		await expect(overlayButton(page, "ai")).toBeHidden();
 		await composer.pressSequentially(uniqueText("suggest"));
 
-		const badge = badges(page).first();
-		await expect(badge).toHaveAttribute("data-clickable", "");
-
-		await badge.click();
+		const ai = overlayButton(page, "ai");
+		await expect(ai).toBeVisible();
+		await ai.click();
 		const panel = page.locator(".panel");
 		await expect(panel).toBeVisible();
 		await expect(panel).toContainText("API キーが正しくありません", {
 			timeout: 15_000,
 		});
-		// バッジを押しても入力欄のフォーカスは外れない
+		// ボタンを押しても入力欄のフォーカスは外れない
 		await expect(composer).toBeFocused();
 
 		await clearComposer(composer);
 		await expect(panel).toBeHidden();
+	});
+});
+
+test.describe("定型文", () => {
+	const template = {
+		id: "e2e-template",
+		name: "e2e お礼",
+		body: "**ありがとうございます**\n- 一つ目",
+	};
+
+	test.beforeEach(async ({ serviceWorker }) => {
+		await serviceWorker.evaluate(async (t) => {
+			const { chrome } = globalThis as unknown as {
+				chrome: { storage: { local: { set(items: object): Promise<void> } } };
+			};
+			await chrome.storage.local.set({ templates: [t] });
+		}, template);
+	});
+
+	test("一覧から選ぶと書式付きで入り、使った定型文が記録に残る", async ({
+		page,
+		serviceWorker,
+	}) => {
+		const composer = channelComposer(page);
+		await composer.click();
+		await page.keyboard.type("前置き ");
+		const button = overlayButton(page, "template");
+		await expect(button).toBeVisible();
+		await page.screenshot({ path: "test-results/overlay-footer.png" });
+		await button.click();
+
+		const search = page.locator(".picker input");
+		await expect(search).toBeFocused();
+		// 検索欄で打った文字は Slack の入力欄に入らない
+		await page.keyboard.type("お礼");
+		await expect(page.locator(".picker li[data-index]")).toHaveCount(1);
+		await page.keyboard.press("Enter");
+
+		await expect(page.locator(".picker")).toBeHidden();
+		await expect(composer.locator("strong")).toHaveText("ありがとうございます");
+		await expect(composer.locator("li")).toHaveText("一つ目");
+		await waitElapsed(page, MIN_DISCARD_MS);
+		await clearComposer(composer);
+
+		await expect.poll(() => readRecords(serviceWorker)).toHaveLength(1);
+		const [record] = await readRecords(serviceWorker);
+		// Slack は貼り付けたリストの前に空行を入れる
+		expect(record?.text).toBe("前置き **ありがとうございます**\n\n- 一つ目");
+		expect(record?.templateIds).toEqual([template.id]);
+	});
+
+	test("空の入力欄でも定型文で書き始められる", async ({
+		page,
+		serviceWorker,
+	}) => {
+		const composer = channelComposer(page);
+		await expect(badges(page)).toHaveCount(0);
+		await overlayButton(page, "template").click();
+		await page.keyboard.press("Enter");
+		await expect(composer.locator("strong")).toHaveText("ありがとうございます");
+		await expect(badges(page)).toHaveCount(1);
+		await waitElapsed(page, MIN_DISCARD_MS);
+		await clearComposer(composer);
+
+		await expect.poll(() => readRecords(serviceWorker)).toHaveLength(1);
+		const [record] = await readRecords(serviceWorker);
+		expect(record?.templateIds).toEqual([template.id]);
 	});
 });

@@ -86,15 +86,15 @@
 
 ## 層の分け方
 
-| ファイル                 | 層               | 責務                                                                |
-| ------------------------ | ---------------- | ------------------------------------------------------------------- |
-| `lib/slack-dom.ts`       | IO（Slack DOM）  | セレクタと DOM の探索。Slack の変更で壊れたら直すのはここだけ       |
-| `lib/draft-session.ts`   | ドメイン（純粋） | 開始・終了・送信か破棄かの判定                                      |
-| `lib/compose-record.ts`  | ドメイン（純粋） | 記録の型、集計、CSV 変換                                            |
-| `lib/duration.ts`        | 純粋             | 表示用の時間フォーマット                                            |
-| `lib/record-store.ts`    | IO（storage）    | 永続化                                                              |
-| `lib/elapsed-badge.ts`   | IO（UI）         | バッジの描画。Shadow DOM に fixed 配置し、Quill の DOM には触れない |
-| `entrypoints/content.ts` | 組み立て         | イベントの購読、定期チェック、各層の接続                            |
+| ファイル                  | 層               | 責務                                                                                                                    |
+| ------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `lib/slack-dom.ts`        | IO（Slack DOM）  | セレクタと DOM の探索。Slack の変更で壊れたら直すのはここだけ                                                           |
+| `lib/draft-session.ts`    | ドメイン（純粋） | 開始・終了・送信か破棄かの判定                                                                                          |
+| `lib/compose-record.ts`   | ドメイン（純粋） | 記録の型、集計、CSV 変換                                                                                                |
+| `lib/duration.ts`         | 純粋             | 表示用の時間フォーマット                                                                                                |
+| `lib/record-store.ts`     | IO（storage）    | 永続化                                                                                                                  |
+| `lib/composer-overlay.ts` | IO（UI）         | 経過時間・AI・定型文のボタンの描画。Shadow DOM に fixed 配置し、Slack の DOM には触れない（docs/composer-ui-design.md） |
+| `entrypoints/content.ts`  | 組み立て         | イベントの購読、定期チェック、各層の接続                                                                                |
 
 ## テスト
 
