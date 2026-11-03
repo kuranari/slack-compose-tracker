@@ -9,6 +9,8 @@ export default defineConfig({
 		description: "Slackメッセージ作成時間トラッカー",
 		// 本文と文字の履歴を残すため storage.local の 10MB 上限を外す
 		permissions: ["storage", "unlimitedStorage"],
+		// AI の提案で、background から Claude API を呼ぶ (docs/ai-suggest-design.md)
+		host_permissions: ["https://api.anthropic.com/*"],
 		// 拡張機能 ID を固定する公開鍵 (ID: andgbpomldibkaoklgpnnomddfmdhfpj)。
 		// 手で読み込む拡張の ID は本来フォルダのパスで決まり、storage も ID ごとに分かれる。
 		// 2 台の端末や開発用/本番用ビルドでパスが違っても、記録を同じ拡張のものとして扱うため。

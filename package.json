@@ -33,5 +33,8 @@
 		"web-ext": "^10.5.0",
 		"wxt": "^0.21.3"
 	},
-	"license": "MIT"
+	"license": "MIT",
+	"dependencies": {
+		"@anthropic-ai/sdk": "^1.4.0"
+	}
 }

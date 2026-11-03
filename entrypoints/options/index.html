@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Slack Compose Tracker の設定</title>
+    <meta name="manifest.open_in_tab" content="false" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      main {
+        padding: 12px 16px;
+        max-width: 480px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 15px;
+      }
+      label {
+        display: block;
+        margin: 8px 0;
+      }
+      input[type="password"] {
+        box-sizing: border-box;
+        width: 100%;
+        font: inherit;
+      }
+      .note {
+        opacity: 0.7;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>AI の提案</h1>
+      <p class="note">
+        入力欄のバッジを押すと、Claude に直し方を提案させます。書き始めて 5
+        分を超えると、バッジが目立って押すよう促します。押したときだけ、その下書きの本文を
+        Anthropic の API に送ります。
+      </p>
+      <form id="form">
+        <label>
+          <input type="checkbox" id="enabled" />
+          この端末で AI の提案を使う
+        </label>
+        <label>
+          Anthropic の API キー
+          <input type="password" id="api-key" autocomplete="off" />
+        </label>
+        <button type="submit">保存</button>
+        <span id="status" class="note"></span>
+      </form>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

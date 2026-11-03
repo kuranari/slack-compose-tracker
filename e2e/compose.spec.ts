@@ -226,3 +226,39 @@ test.describe("日本語入力 (IME)", () => {
 		expect(record?.snapshots.map((s) => s.text)).toEqual(["テスト"]);
 	});
 });
+
+test.describe("AI の提案", () => {
+	test.beforeEach(async ({ serviceWorker }) => {
+		// 本物のキーは使わない。ダミーのキーなので API は認証エラーを返し、その表示までを確かめる
+		await serviceWorker.evaluate(async () => {
+			const { chrome } = globalThis as unknown as {
+				chrome: { storage: { local: { set(items: object): Promise<void> } } };
+			};
+			await chrome.storage.local.set({
+				"suggest-settings": { enabled: true, apiKey: "e2e-dummy-key" },
+			});
+		});
+	});
+
+	test("有効にするとバッジが押せるようになり、押すとパネルに結果が出る", async ({
+		page,
+	}) => {
+		const composer = channelComposer(page);
+		await composer.pressSequentially(uniqueText("suggest"));
+
+		const badge = badges(page).first();
+		await expect(badge).toHaveAttribute("data-clickable", "");
+
+		await badge.click();
+		const panel = page.locator(".panel");
+		await expect(panel).toBeVisible();
+		await expect(panel).toContainText("API キーが正しくありません", {
+			timeout: 15_000,
+		});
+		// バッジを押しても入力欄のフォーカスは外れない
+		await expect(composer).toBeFocused();
+
+		await clearComposer(composer);
+		await expect(panel).toBeHidden();
+	});
+});

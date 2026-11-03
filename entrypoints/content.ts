@@ -11,7 +11,7 @@ import {
 } from "@/lib/draft-session";
 import { elapsedLevel, formatDuration } from "@/lib/duration";
 import { createBadgeLayer } from "@/lib/elapsed-badge";
-import { saveRecordMessage } from "@/lib/messages";
+import { saveRecordMessage, suggestMessage } from "@/lib/messages";
 import {
 	closestComposer,
 	composerChannelId,
@@ -27,6 +27,12 @@ import {
 	threadRootChannelId,
 	threadRootTs,
 } from "@/lib/slack-dom";
+import type { SuggestResult } from "@/lib/suggest-prompt";
+import {
+	getSuggestSettings,
+	isSuggestReady,
+	watchSuggestSettings,
+} from "@/lib/suggest-settings";
 
 // オブジェクトのままだと DevTools 外 (CDP 経由のログ取得) で "Object" に潰れるため文字列化する
 const format = (args: unknown[]) =>
@@ -46,7 +52,38 @@ export default defineContentScript({
 
 		const sessions = new Map<string, DraftSession>();
 		const pendingSends = new Map<string, number>();
-		const badges = createBadgeLayer();
+		// バッジを押すと、AI に本文を見てもらう (docs/ai-suggest-design.md)。
+		// 本文を外部に送るので、オプション画面で有効にした端末でだけ押せるようにする
+		let suggestReady = false;
+		void getSuggestSettings().then((s) => {
+			suggestReady = isSuggestReady(s);
+		});
+		ctx.onInvalidated(
+			watchSuggestSettings((s) => {
+				suggestReady = isSuggestReady(s);
+			}),
+		);
+		const asking = new WeakSet<HTMLElement>();
+		const askSuggestion = (composer: HTMLElement) => {
+			const draft = composerText(composer);
+			if (!draft || asking.has(composer)) return;
+			asking.add(composer);
+			badges.showPanel(composer, "loading", "考えています…");
+			browser.runtime
+				.sendMessage(suggestMessage(draft))
+				.then((result: SuggestResult) => {
+					if (!badges.isPanelFor(composer)) return;
+					if (result.ok) badges.showPanel(composer, "done", result.text);
+					else badges.showPanel(composer, "error", result.error);
+				})
+				.catch((err: unknown) => {
+					if (badges.isPanelFor(composer)) {
+						badges.showPanel(composer, "error", String(err));
+					}
+				})
+				.finally(() => asking.delete(composer));
+		};
+		const badges = createBadgeLayer(askSuggestion);
 		ctx.onInvalidated(badges.destroy);
 
 		// URL がチャンネルを指していない画面 (Threads 一覧など) や、親メッセージが
@@ -211,10 +248,12 @@ export default defineContentScript({
 						observeText(session, now, text, composing.has(composer)),
 					);
 					const elapsed = now - session.startedAt;
+					const level = elapsedLevel(elapsed);
 					items.push({
 						composer,
 						text: formatDuration(elapsed),
-						level: elapsedLevel(elapsed),
+						level,
+						clickable: suggestReady,
 					});
 					continue;
 				}
