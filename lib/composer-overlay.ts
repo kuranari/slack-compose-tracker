@@ -55,7 +55,15 @@ const STYLE = `
 		color: var(--icon);
 		cursor: pointer;
 	}
-	.bar button:hover {
+	/* 未入力のときは、Slack の空の送信ボタンと同じように薄くして押せなくする */
+	.badge[data-idle] {
+		opacity: 0.4;
+	}
+	.bar button:disabled {
+		opacity: 0.4;
+		cursor: default;
+	}
+	.bar button:enabled:hover {
 		background: var(--icon-hover);
 	}
 	.bar svg {
@@ -166,10 +174,10 @@ const PANEL_GAP_PX = 6;
 
 export type OverlayItem = {
 	composer: HTMLElement;
-	// 下書きが無ければ経過時間を出さない
+	// 下書きが無ければ null。経過時間と AI のボタンは、薄くして押せなくする
 	elapsed: { text: string; level: ElapsedLevel } | null;
-	// AI の提案を有効にしていて、下書きがあるとき
-	canAsk: boolean;
+	// オプション画面で AI の提案を有効にしているか。無効なら AI のボタンを出さない
+	aiEnabled: boolean;
 };
 
 export type PanelState = "loading" | "done" | "error";
@@ -512,17 +520,18 @@ export function createComposerOverlay(handlers: OverlayHandlers) {
 
 	const render = (items: readonly OverlayItem[]) => {
 		const visible = new Set<HTMLElement>();
-		for (const { composer, elapsed, canAsk } of items) {
+		for (const { composer, elapsed, aiEnabled } of items) {
 			let bar = bars.get(composer);
 			if (!bar) {
 				bar = createBar(composer);
 				bars.set(composer, bar);
 			}
-			bar.badge.hidden = !elapsed;
-			bar.badge.textContent = elapsed?.text ?? "";
+			bar.badge.toggleAttribute("data-idle", !elapsed);
+			bar.badge.textContent = elapsed?.text ?? "0:00";
 			bar.badge.dataset.level = elapsed?.level ?? "normal";
 			bar.el.dataset.level = elapsed?.level ?? "normal";
-			bar.ai.hidden = !canAsk;
+			bar.ai.hidden = !aiEnabled;
+			bar.ai.disabled = !elapsed;
 			matchColors(composerFooter(composer)?.iconButton ?? null);
 			visible.add(composer);
 		}

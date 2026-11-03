@@ -289,11 +289,13 @@ test.describe("AI の提案", () => {
 		page,
 	}) => {
 		const composer = channelComposer(page);
-		await expect(overlayButton(page, "ai")).toBeHidden();
+		const ai = overlayButton(page, "ai");
+		// 未入力のときは出ているが押せない
+		await expect(ai).toBeDisabled();
+		await expect(page.locator(".badge[data-idle]").first()).toHaveText("0:00");
 		await composer.pressSequentially(uniqueText("suggest"));
 
-		const ai = overlayButton(page, "ai");
-		await expect(ai).toBeVisible();
+		await expect(ai).toBeEnabled();
 		await ai.click();
 		const panel = page.locator(".panel");
 		await expect(panel).toBeVisible();

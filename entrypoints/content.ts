@@ -369,9 +369,9 @@ export default defineContentScript({
 				if (!c) continue;
 				const key = draftKey(c);
 				const session = sessions.get(key);
-				// 定型文のボタンは空の入力欄にも出す
+				// 空の入力欄でもボタンは出す (定型文で書き始められるように)
 				if (!session) {
-					items.push({ composer, elapsed: null, canAsk: false });
+					items.push({ composer, elapsed: null, aiEnabled: suggestReady });
 					continue;
 				}
 				const text = composerText(composer);
@@ -387,11 +387,11 @@ export default defineContentScript({
 							text: formatDuration(elapsed),
 							level: elapsedLevel(elapsed),
 						},
-						canAsk: suggestReady,
+						aiEnabled: suggestReady,
 					});
 					continue;
 				}
-				items.push({ composer, elapsed: null, canAsk: false });
+				items.push({ composer, elapsed: null, aiEnabled: suggestReady });
 				sessions.delete(key);
 				suggestions.delete(key);
 				const record = closeSession(session, c, now, pendingSends.get(key));

@@ -30,9 +30,9 @@ export function threadSendButton(page: Page): Locator {
 }
 
 // Shadow DOM (open) 内の経過時間。Playwright の CSS ロケータは open な shadow root を貫通する。
-// 入力欄ごとのボタンの列は常にあり、経過時間は下書きがあるときだけ見える
+// 入力欄ごとのボタンの列は常にあり、下書きが無いときの経過時間は data-idle で薄く出る
 export function badges(page: Page): Locator {
-	return page.locator(".badge:not([hidden])");
+	return page.locator(".badge:not([data-idle])");
 }
 
 // 入力欄の下の列に重ねた、自前のボタン
