@@ -369,12 +369,18 @@ export default defineContentScript({
 				if (!c) continue;
 				const key = draftKey(c);
 				const session = sessions.get(key);
-				// 空の入力欄でもボタンは出す (定型文で書き始められるように)
+				const text = composerText(composer);
 				if (!session) {
-					items.push({ composer, elapsed: null, aiEnabled: suggestReady });
+					// 計測していない下書き (リロード後に Slack が戻したものなど) に聞いた提案も、
+					// 消されたら忘れる
+					if (!text) suggestions.delete(key);
+					// 空の入力欄でもボタンは出す (定型文で書き始められるように)
+					items.push({
+						composer,
+						draft: { type: text ? "untracked" : "empty" },
+					});
 					continue;
 				}
-				const text = composerText(composer);
 				if (text) {
 					sessions.set(
 						key,
@@ -383,22 +389,22 @@ export default defineContentScript({
 					const elapsed = now - session.startedAt;
 					items.push({
 						composer,
-						elapsed: {
+						draft: {
+							type: "timing",
 							text: formatDuration(elapsed),
 							level: elapsedLevel(elapsed),
 						},
-						aiEnabled: suggestReady,
 					});
 					continue;
 				}
-				items.push({ composer, elapsed: null, aiEnabled: suggestReady });
+				items.push({ composer, draft: { type: "empty" } });
 				sessions.delete(key);
 				suggestions.delete(key);
 				const record = closeSession(session, c, now, pendingSends.get(key));
 				if (shouldSave(record)) save(record);
 				pendingSends.delete(key);
 			}
-			badges.render(items);
+			badges.render(items, { aiReady: suggestReady });
 		}, TICK_MS);
 
 		ctx.setInterval(() => {

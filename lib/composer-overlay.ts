@@ -2,7 +2,7 @@
 // Slack のエディタ (Quill) やツールバーの DOM に要素を差し込むと、編集内容やボタンの畳み方を
 // 壊しうるため、body 直下の Shadow DOM に fixed 配置し、列の矩形に合わせて位置だけ追従させる。
 // 列に収まらないときは入力欄の右上に出す (docs/composer-ui-design.md)
-import type { ElapsedLevel } from "@/lib/duration";
+import { type ElapsedLevel, formatDuration } from "@/lib/duration";
 import { composerFooter } from "@/lib/slack-dom";
 import { filterTemplates, type Template } from "@/lib/templates";
 
@@ -59,11 +59,11 @@ const STYLE = `
 	.badge[data-idle] {
 		opacity: 0.4;
 	}
-	.bar button:disabled {
+	.bar button[aria-disabled="true"] {
 		opacity: 0.4;
 		cursor: default;
 	}
-	.bar button:enabled:hover {
+	.bar button:not([aria-disabled="true"]):hover {
 		background: var(--icon-hover);
 	}
 	.bar svg {
@@ -168,16 +168,32 @@ const STYLE = `
 const AI_ICON = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M10 2.5l1.6 4.4 4.4 1.6-4.4 1.6L10 14.5l-1.6-4.4L4 8.5l4.4-1.6z"/><path d="M15.5 13l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z"/></svg>`;
 const TEMPLATE_ICON = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><rect x="4" y="2.75" width="12" height="14.5" rx="2"/><path d="M7 7h6M7 10h6M7 13h3.5"/></svg>`;
 
+// 計測していないときの経過時間の表示
+const IDLE_TEXT = formatDuration(0);
+const UNTRACKED_TEXT = "–";
+
 const FOOTER_GAP_PX = 4;
 const FALLBACK_INSET_PX = 8;
 const PANEL_GAP_PX = 6;
 
+// 入力欄の下書きの状態
+// - empty: 空。経過時間と AI のボタンは薄くして押せなくする
+// - untracked: 文字はあるが、計測していない (Slack がリロード後に下書きを戻した場合など。
+//   開始がわからないので計測しない、docs/compose-tracking-design.md)。経過時間は "–"、AI は押せる
+// - timing: 計測中
+export type DraftState =
+	| { type: "empty" }
+	| { type: "untracked" }
+	| { type: "timing"; text: string; level: ElapsedLevel };
+
 export type OverlayItem = {
 	composer: HTMLElement;
-	// 下書きが無ければ null。経過時間と AI のボタンは、薄くして押せなくする
-	elapsed: { text: string; level: ElapsedLevel } | null;
-	// オプション画面で AI の提案を有効にしているか。無効なら AI のボタンを出さない
-	aiEnabled: boolean;
+	draft: DraftState;
+};
+
+export type RenderOptions = {
+	// AI の提案を使える (オプション画面で有効にし、API キーも入れた) か。使えなければ AI のボタンを出さない
+	aiReady: boolean;
 };
 
 export type PanelState = "loading" | "done" | "error";
@@ -431,9 +447,11 @@ export function createComposerOverlay(handlers: OverlayHandlers) {
 		const ai = iconButton("ai", "AI に聞く", AI_ICON);
 		const template = iconButton("template", "定型文", TEMPLATE_ICON);
 		// 開いているパネルをもう一度押したら閉じる
-		ai.addEventListener("click", () =>
-			panelComposer === composer ? hidePanel() : handlers.onAsk(composer),
-		);
+		ai.addEventListener("click", () => {
+			if (ai.getAttribute("aria-disabled") === "true") return;
+			if (panelComposer === composer) hidePanel();
+			else handlers.onAsk(composer);
+		});
 		template.addEventListener("click", () =>
 			pickerComposer === composer ? hidePicker() : showPicker(composer),
 		);
@@ -518,20 +536,28 @@ export function createComposerOverlay(handlers: OverlayHandlers) {
 		frame = requestAnimationFrame(loop);
 	});
 
-	const render = (items: readonly OverlayItem[]) => {
+	const render = (items: readonly OverlayItem[], options: RenderOptions) => {
 		const visible = new Set<HTMLElement>();
-		for (const { composer, elapsed, aiEnabled } of items) {
+		for (const { composer, draft } of items) {
 			let bar = bars.get(composer);
 			if (!bar) {
 				bar = createBar(composer);
 				bars.set(composer, bar);
 			}
-			bar.badge.toggleAttribute("data-idle", !elapsed);
-			bar.badge.textContent = elapsed?.text ?? "0:00";
-			bar.badge.dataset.level = elapsed?.level ?? "normal";
-			bar.el.dataset.level = elapsed?.level ?? "normal";
-			bar.ai.hidden = !aiEnabled;
-			bar.ai.disabled = !elapsed;
+			const level = draft.type === "timing" ? draft.level : "normal";
+			bar.badge.toggleAttribute("data-idle", draft.type !== "timing");
+			bar.badge.textContent =
+				draft.type === "timing"
+					? draft.text
+					: draft.type === "untracked"
+						? UNTRACKED_TEXT
+						: IDLE_TEXT;
+			bar.badge.dataset.level = level;
+			bar.el.dataset.level = level;
+			bar.ai.hidden = !options.aiReady;
+			// disabled にすると mousedown が届かず、押したときに入力欄のフォーカスが外れるので、
+			// 見た目だけ押せない状態にして、押されても何もしない
+			bar.ai.setAttribute("aria-disabled", String(draft.type === "empty"));
 			matchColors(composerFooter(composer)?.iconButton ?? null);
 			visible.add(composer);
 		}
@@ -544,7 +570,7 @@ export function createComposerOverlay(handlers: OverlayHandlers) {
 		placeAll();
 		// 下書きが終わったら提案を閉じる。入力欄が消えたら一覧も閉じる
 		const asked = items.find((i) => i.composer === panelComposer);
-		if (panelComposer && !asked?.elapsed) hidePanel();
+		if (panelComposer && (!asked || asked.draft.type === "empty")) hidePanel();
 		if (pickerComposer && !visible.has(pickerComposer)) hidePicker();
 	};
 

@@ -290,12 +290,17 @@ test.describe("AI の提案", () => {
 	}) => {
 		const composer = channelComposer(page);
 		const ai = overlayButton(page, "ai");
-		// 未入力のときは出ているが押せない
-		await expect(ai).toBeDisabled();
+		// 未入力のときは出ているが押せない。押しても入力欄のフォーカスは外れない
+		await expect(ai).toHaveAttribute("aria-disabled", "true");
 		await expect(page.locator(".badge[data-idle]").first()).toHaveText("0:00");
+		await composer.click();
+		// Playwright は aria-disabled のボタンを押せないものとして待つので、押す操作を強制する
+		await ai.click({ force: true });
+		await expect(composer).toBeFocused();
+		await expect(page.locator(".panel")).toBeHidden();
 		await composer.pressSequentially(uniqueText("suggest"));
 
-		await expect(ai).toBeEnabled();
+		await expect(ai).toHaveAttribute("aria-disabled", "false");
 		await ai.click();
 		const panel = page.locator(".panel");
 		await expect(panel).toBeVisible();
@@ -308,6 +313,38 @@ test.describe("AI の提案", () => {
 		await clearComposer(composer);
 		await expect(panel).toBeHidden();
 	});
+});
+
+test("リロード後に Slack が戻した下書きは計測せず、経過時間を – にする", async ({
+	page,
+	serviceWorker,
+}) => {
+	await serviceWorker.evaluate(async () => {
+		const { chrome } = globalThis as unknown as {
+			chrome: { storage: { local: { set(items: object): Promise<void> } } };
+		};
+		await chrome.storage.local.set({
+			"suggest-settings": { enabled: true, apiKey: "e2e-dummy-key" },
+		});
+	});
+	const text = uniqueText("restored");
+	await channelComposer(page).pressSequentially(text);
+	// Slack が下書きを保存するのを待ってから読み込み直す
+	await page.waitForTimeout(3_000);
+	await page.reload();
+	const composer = channelComposer(page);
+	await expect(composer).toHaveText(text, { timeout: 30_000 });
+
+	await expect(page.locator(".badge[data-idle]").first()).toHaveText("–");
+	await expect(overlayButton(page, "ai")).toHaveAttribute(
+		"aria-disabled",
+		"false",
+	);
+	await clearComposer(composer);
+	await expect(page.locator(".badge[data-idle]").first()).toHaveText("0:00");
+	// 計測していないので、消しても破棄として記録しない
+	await page.waitForTimeout(1_000);
+	expect(await readRecords(serviceWorker)).toHaveLength(0);
 });
 
 test.describe("AI の提案 (API を差し替え)", () => {
