@@ -377,6 +377,25 @@ test.describe("AI の提案 (API を差し替え)", () => {
 		);
 		expect(calls).toBe(1);
 
+		// 本文の一部を選んでコピーできる
+		await page
+			.context()
+			.grantPermissions(["clipboard-read", "clipboard-write"]);
+		const body = panel.locator(".panel-body");
+		// マウスでなぞって選ぶ。クリップボードに入るのは選んだ文字だけ
+		const box = await body.boundingBox();
+		if (!box) throw new Error("提案の本文が見えない");
+		await page.mouse.move(box.x + 1, box.y + 4);
+		await page.mouse.down();
+		await page.mouse.move(box.x + box.width - 1, box.y + box.height - 4, {
+			steps: 5,
+		});
+		await page.mouse.up();
+		await page.keyboard.press("ControlOrMeta+c");
+		await expect
+			.poll(() => page.evaluate(() => navigator.clipboard.readText()))
+			.toContain("**文案1**");
+
 		await panel.locator("button.retry").click();
 		await expect(panel).toContainText("**文案2**");
 		await expect(panel.locator(".panel-note")).toBeHidden();

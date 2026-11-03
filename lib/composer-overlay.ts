@@ -93,6 +93,14 @@ const STYLE = `
 	.panel-body {
 		margin: 0 0 8px;
 		white-space: pre-wrap;
+		user-select: text;
+		cursor: text;
+		outline: none;
+	}
+	.panel-note {
+		margin: 0 0 6px;
+		font-size: 12px;
+		opacity: 0.7;
 	}
 	.panel[data-state="error"] .panel-body {
 		color: #e01e5a;
@@ -210,12 +218,24 @@ export function createComposerOverlay(handlers: OverlayHandlers) {
 	let templates: Template[] = [];
 
 	// ボタンを押しても入力欄からフォーカスを奪わないよう、mousedown の既定動作を止める。
-	// 定型文の検索欄だけはフォーカスを受け取る
+	// 定型文の検索欄と、文字を選んでコピーできる提案の本文だけは、フォーカスと選択を受け取る
 	root.addEventListener("mousedown", (e) => {
-		if (!(e.target instanceof HTMLInputElement)) e.preventDefault();
+		const target = e.target as Element;
+		if (target instanceof HTMLInputElement) return;
+		if (target.closest?.(".panel-body")) return;
+		e.preventDefault();
 	});
-	// 検索欄で打った文字やキーが Slack に届くと、入力欄に移ったりショートカットが動いたりするので止める
-	for (const type of ["keydown", "keyup", "keypress", "input", "beforeinput"]) {
+	// 検索欄や提案の本文で打ったキーが Slack に届くと、入力欄に移ったりショートカットが動いたり、
+	// Slack のコピーの処理が選んだ文字を上書きしたりするので、Shadow DOM の外へは伝えない
+	for (const type of [
+		"keydown",
+		"keyup",
+		"keypress",
+		"input",
+		"beforeinput",
+		"copy",
+		"cut",
+	]) {
 		root.addEventListener(type, (e) => e.stopPropagation());
 	}
 
@@ -225,6 +245,8 @@ export function createComposerOverlay(handlers: OverlayHandlers) {
 	panel.hidden = true;
 	const panelBody = document.createElement("p");
 	panelBody.className = "panel-body";
+	// 押したときにフォーカスを受け取り、Cmd+C などのキーが入力欄ではなくここに届くようにする
+	panelBody.tabIndex = -1;
 	const copyButton = document.createElement("button");
 	copyButton.type = "button";
 	copyButton.textContent = "コピー";
