@@ -148,6 +148,24 @@ test("スレッドで送信ボタンを押すと threadTs 付きで記録され�
 	});
 });
 
+test("貼り付けで始めた下書きも記録される", async ({ page, serviceWorker }) => {
+	// Slack は貼り付けを自前で処理して DOM を書き換え、input イベントを出さない
+	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+	const text = uniqueText("paste");
+	await page.evaluate((t) => navigator.clipboard.writeText(t), text);
+	const composer = channelComposer(page);
+	await composer.click();
+	await page.keyboard.press("ControlOrMeta+v");
+	await expect(composer).toHaveText(text);
+	await expect(badges(page)).toHaveCount(1);
+	await waitElapsed(page, MIN_DISCARD_MS);
+	await clearComposer(composer);
+
+	await expect.poll(() => readRecords(serviceWorker)).toHaveLength(1);
+	const [record] = await readRecords(serviceWorker);
+	expect(record).toMatchObject({ outcome: "discarded", text });
+});
+
 test("太字やリストは Markdown の記法で本文に残る", async ({
 	page,
 	serviceWorker,

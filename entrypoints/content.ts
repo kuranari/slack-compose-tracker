@@ -196,20 +196,34 @@ export default defineContentScript({
 			"input",
 			(e) => {
 				const composer = closestComposer(e.target);
-				const c = composer && contextOf(composer);
-				if (!composer || !c) return;
-				const text = composerText(composer);
-				if (!text) return;
-				const key = draftKey(c);
-				// 送信なら Slack は input を出さずに入力欄を空にする。送信操作の後に文字が残る入力が
-				// 来たなら、その Enter は補完 (チャンネル・メンション・絵文字) の確定や改行だった
-				pendingSends.delete(key);
-				const prev = sessions.get(key);
-				sessions.set(
-					key,
-					recordInput(prev, Date.now(), text, composing.has(composer)),
-				);
-				if (!prev) log("start", c);
+				if (composer) onComposerInput(composer);
+			},
+			{ capture: true },
+		);
+
+		// Slack は貼り付けを自前で処理して DOM を書き換え、input イベントを出さない (2026-11-03 に確認)。
+		// 書き換えは非同期のことがある (空の入力欄に Markdown を貼ったときなど) ので、
+		// 貼り付けの後しばらく入力欄を見張り、文字が入ったところで入力として扱う
+		const PASTE_WATCH_MS = 1_000;
+		ctx.addEventListener(
+			document,
+			"paste",
+			(e) => {
+				const composer = closestComposer(e.target);
+				if (!composer) return;
+				// 途中の書き換えで一度空になることもあるので、文字が入るまで待つ
+				const observer = new MutationObserver(() => {
+					if (!composerText(composer)) return;
+					observer.disconnect();
+					onComposerInput(composer);
+				});
+				observer.observe(composer, {
+					childList: true,
+					subtree: true,
+					characterData: true,
+				});
+				ctx.setTimeout(() => observer.disconnect(), PASTE_WATCH_MS);
+				ctx.onInvalidated(() => observer.disconnect());
 			},
 			{ capture: true },
 		);
@@ -223,6 +237,23 @@ export default defineContentScript({
 			},
 			{ capture: true },
 		);
+
+		const onComposerInput = (composer: HTMLElement) => {
+			const c = contextOf(composer);
+			if (!c) return;
+			const text = composerText(composer);
+			if (!text) return;
+			const key = draftKey(c);
+			// 送信なら Slack は input を出さずに入力欄を空にする。送信操作の後に文字が残る入力が
+			// 来たなら、その Enter は補完 (チャンネル・メンション・絵文字) の確定や改行だった
+			pendingSends.delete(key);
+			const prev = sessions.get(key);
+			sessions.set(
+				key,
+				recordInput(prev, Date.now(), text, composing.has(composer)),
+			);
+			if (!prev) log("start", c);
+		};
 
 		ctx.addEventListener(
 			document,
