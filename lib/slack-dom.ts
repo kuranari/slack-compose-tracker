@@ -82,6 +82,8 @@ export function findComposers(root: ParentNode = document): HTMLElement[] {
 // 入力欄の下の列 (添付・絵文字・@ と送信ボタンが並ぶ所)。書式ツールバーと違い、
 // 「Aa」で書式を隠しても消えないので、自前のボタンはここに合わせて置く (docs/composer-ui-design.md)
 export type ComposerFooter = {
+	// 入力欄の枠 (書式ツールバー・入力欄・下の列を囲む)
+	container: Element;
 	// Slack のボタンの右端 (画面上の x 座標)。自前のボタンはこれより右に置く
 	buttonsRight: number;
 	// 送信ボタンのある右端。自前のボタンはこの左に置く
@@ -107,6 +109,7 @@ export function composerFooter(composer: HTMLElement): ComposerFooter | null {
 			.map((r) => r.right),
 	);
 	return {
+		container,
 		buttonsRight,
 		suffix,
 		iconButton: container.querySelector('[data-qa="texty_mention_button"]'),

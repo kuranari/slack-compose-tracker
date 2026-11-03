@@ -41,6 +41,11 @@ const STYLE = `
 		color: #fff;
 		opacity: 1;
 	}
+	/* 下の列に収まらないときは、使っていないものを隠して詰める */
+	.bar[data-compact] .badge[data-idle],
+	.bar[data-compact] .ai[aria-disabled="true"] {
+		display: none;
+	}
 	.bar button {
 		display: inline-flex;
 		align-items: center;
@@ -174,6 +179,7 @@ const UNTRACKED_TEXT = "–";
 
 const FOOTER_GAP_PX = 4;
 const FALLBACK_INSET_PX = 8;
+const ABOVE_GAP_PX = 2;
 const PANEL_GAP_PX = 6;
 
 // 入力欄の下書きの状態
@@ -479,15 +485,25 @@ export function createComposerOverlay(handlers: OverlayHandlers) {
 		if (el.style[prop] !== value) el.style[prop] = value;
 	};
 
-	// 送信ボタンの左に置く。Slack のボタンと重なるなら、入力欄の右上に逃がす
+	// 送信ボタンの左に置く。収まらなければ、使っていないもの (薄い経過時間と押せない AI) を
+	// 隠して詰める。それでも収まらなければ、入力欄の枠のすぐ上に逃がす (文字に重ねないため)。
+	// 狭いスレッドでは下の列の空きが 50px ほどしかない (2026-11-03 に計測、docs/composer-ui-design.md)
 	const place = (bar: Bar, composer: HTMLElement) => {
 		const viewportWidth = document.documentElement.clientWidth;
 		const footer = composerFooter(composer);
-		const width = bar.el.getBoundingClientRect().width;
 		if (footer) {
 			const suffix = footer.suffix.getBoundingClientRect();
-			const left = suffix.left - FOOTER_GAP_PX - width;
-			if (suffix.width > 0 && left >= footer.buttonsRight + FOOTER_GAP_PX) {
+			const free =
+				suffix.left - FOOTER_GAP_PX - (footer.buttonsRight + FOOTER_GAP_PX);
+			const fits = () => bar.el.getBoundingClientRect().width <= free;
+			bar.el.removeAttribute("data-compact");
+			let inFooter = suffix.width > 0 && fits();
+			if (suffix.width > 0 && !inFooter) {
+				bar.el.setAttribute("data-compact", "");
+				inFooter = fits();
+				if (!inFooter) bar.el.removeAttribute("data-compact");
+			}
+			if (inFooter) {
 				setPosition(bar.el, "top", suffix.top + suffix.height / 2);
 				setPosition(
 					bar.el,
@@ -498,22 +514,28 @@ export function createComposerOverlay(handlers: OverlayHandlers) {
 				return;
 			}
 		}
-		const rect = composer.getBoundingClientRect();
-		setPosition(bar.el, "top", rect.top + 14);
-		setPosition(
-			bar.el,
-			"right",
-			viewportWidth - rect.right + FALLBACK_INSET_PX,
-		);
-		bar.el.dataset.placement = "composer";
+		const frame = (footer?.container ?? composer).getBoundingClientRect();
+		const height = bar.el.getBoundingClientRect().height;
+		setPosition(bar.el, "top", frame.top - ABOVE_GAP_PX - height / 2);
+		setPosition(bar.el, "right", viewportWidth - frame.right);
+		bar.el.dataset.placement = "above";
 	};
 
 	// パネルと一覧は入力欄の上に開く (入力欄は画面の下にあるため)
-	const placePopover = (popover: HTMLElement, composer: HTMLElement) => {
+	// 列が入力欄の枠の上に逃げているときは、列に重ならないようその上に開く
+	const placePopover = (
+		popover: HTMLElement,
+		composer: HTMLElement,
+		bar: Bar,
+	) => {
 		const viewportWidth = document.documentElement.clientWidth;
 		const viewportHeight = document.documentElement.clientHeight;
 		const rect = composer.getBoundingClientRect();
-		setPosition(popover, "bottom", viewportHeight - rect.top + PANEL_GAP_PX);
+		const top =
+			bar.el.dataset.placement === "above"
+				? Math.min(rect.top, bar.el.getBoundingClientRect().top)
+				: rect.top;
+		setPosition(popover, "bottom", viewportHeight - top + PANEL_GAP_PX);
 		setPosition(
 			popover,
 			"right",
@@ -527,8 +549,8 @@ export function createComposerOverlay(handlers: OverlayHandlers) {
 		for (const [composer, bar] of bars) {
 			if (!composer.isConnected) continue;
 			place(bar, composer);
-			if (composer === panelComposer) placePopover(panel, composer);
-			if (composer === pickerComposer) placePopover(picker, composer);
+			if (composer === panelComposer) placePopover(panel, composer, bar);
+			if (composer === pickerComposer) placePopover(picker, composer, bar);
 		}
 	};
 	let frame = requestAnimationFrame(function loop() {

@@ -11,6 +11,7 @@ import {
 	overlayButton,
 	recordEnterKeydowns,
 	threadComposer,
+	threadPane,
 	threadParentTs,
 	threadSendButton,
 } from "./slack";
@@ -165,6 +166,54 @@ test("貼り付けで始めた下書きも記録される", async ({ page, servi
 	await expect.poll(() => readRecords(serviceWorker)).toHaveLength(1);
 	const [record] = await readRecords(serviceWorker);
 	expect(record).toMatchObject({ outcome: "discarded", text });
+});
+
+test("狭いスレッドでは、使っていないボタンを隠して詰め、収まらなければ入力欄の枠の上に出す", async ({
+	page,
+	serviceWorker,
+}) => {
+	await serviceWorker.evaluate(async () => {
+		const { chrome } = globalThis as unknown as {
+			chrome: { storage: { local: { set(items: object): Promise<void> } } };
+		};
+		await chrome.storage.local.set({
+			"suggest-settings": { enabled: true, apiKey: "e2e-dummy-key" },
+		});
+	});
+	const parentText = uniqueText("narrow-parent");
+	await channelComposer(page).pressSequentially(parentText);
+	await channelComposer(page).press(SEND_KEY);
+	await openThreadOf(page, parentText);
+	// この幅だと、スレッドの下の列の空きは 50px ほど (3 つのボタンは入らない)
+	await page.setViewportSize({ width: 1100, height: 900 });
+	const pane = threadPane(page);
+	const composer = threadComposer(page);
+	const bar = page.locator(".bar").filter({ visible: true }).last();
+	try {
+		// 空の入力欄: 薄い経過時間と押せない AI を隠し、定型文だけ下の列に置く
+		await expect(bar).toHaveAttribute("data-placement", "footer");
+		await expect(bar).toHaveAttribute("data-compact", "");
+		await expect(bar.locator(".badge")).toBeHidden();
+		await expect(bar.locator("button.ai")).toBeHidden();
+		await expect(bar.locator("button.template")).toBeVisible();
+
+		// 書き始めると入らないので、入力欄の枠の上に出す (入力欄の文字に重ねない)
+		await composer.pressSequentially(uniqueText("narrow"));
+		await expect(bar).toHaveAttribute("data-placement", "above");
+		await expect(bar.locator(".badge")).toBeVisible();
+		await expect(bar.locator("button.ai")).toBeVisible();
+		const frame = await composer.evaluate((el) =>
+			el.closest(".c-wysiwyg_container")?.getBoundingClientRect().toJSON(),
+		);
+		const barBox = await bar.boundingBox();
+		expect(barBox && frame && barBox.y + barBox.height).toBeLessThanOrEqual(
+			frame?.top ?? 0,
+		);
+		await expect(pane).toBeVisible();
+		await clearComposer(composer);
+	} finally {
+		await page.setViewportSize({ width: 1400, height: 900 });
+	}
 });
 
 test("太字やリストは Markdown の記法で本文に残る", async ({
